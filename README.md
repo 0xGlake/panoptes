@@ -1,6 +1,6 @@
 # panoptes
 
-- ideas for visualisation
+- ideas for visualisation in terminal
   - cash carry and speculate airdrop
     - spot
       - renegade
@@ -13,5 +13,5 @@
     - spot
       - jito
   - news based trading
-    - regex hooked up with RSS feeds
-  - pumpfun AI
+    - regex hooked up with RSS feeds (PVP twitter clone)
+  - pumpfun AI analyst
