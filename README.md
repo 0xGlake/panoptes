@@ -36,7 +36,7 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 
-- ideas for visualisation in terminal
+# ideas for visualisation
   - cash carry and speculate airdrop
     - spot
       - renegade
@@ -51,3 +51,14 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
   - news based trading
     - regex hooked up with RSS feeds (PVP twitter clone)
   - pumpfun AI analyst
+
+## useful links:
+https://tradingview.github.io/lightweight-charts/tutorials
+
+## cash carry trade todo
+- [ ] display historic funding rates from extended exchange (line graph)
+  - [ ] https://api.extended.exchange/api/v1/info/markets - for getting market tickers and fees
+  - [ ] https://api.docs.extended.exchange/#get-funding-rates-history - for funding history
+  - [ ] https://api.docs.extended.exchange/#get-candles-history - for mark prices
+- [ ] display live prices of extended and rengegade (no historic, candle stick)
+- [ ]
