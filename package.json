@@ -2,9 +2,11 @@
   "name": "panoptes",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "postbuild": "node --loader ts-node/esm app/scripts/deploymentUpdate.ts",
     "start": "next start",
     "lint": "next lint"
   },
@@ -17,7 +19,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@types/node": "^20",
+    "@types/node": "^20.17.15",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
@@ -25,6 +27,7 @@
     "postcss": "^8",
     "prisma": "^6.2.1",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
   }
 }
