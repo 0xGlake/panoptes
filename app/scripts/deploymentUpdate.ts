@@ -16,17 +16,10 @@ async function updateFundingRatesOnDeploy() {
 
     const extendedFetcher = new ExtendedFetcher();
     const symbols = ["BTC-USD", "ETH-USD"];
-    const endTime = new Date();
-    const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
-
-    console.log(
-      `Fetching data from ${startTime.toISOString()} to ${endTime.toISOString()}`,
-    );
 
     const rates = await extendedFetcher.fetchHistoricalFundingRates(
       symbols,
-      startTime,
-      endTime,
+      exchange.id,
     );
 
     if (rates.length > 0) {
