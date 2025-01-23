@@ -20,6 +20,10 @@ async function updateFundingRatesOnDeploy() {
     const rates = await extendedFetcher.fetchHistoricalFundingRates(
       symbols,
       exchange.id,
+      {
+        forceHistorical: false, // Set to true to force historical data fetch
+        daysToFetch: 1, // Fetch 7 days of historical data
+      },
     );
 
     if (rates.length > 0) {

@@ -41,7 +41,12 @@ export class ExtendedFetcher {
   async fetchHistoricalFundingRates(
     symbols: string[],
     exchangeId: string,
+    options: {
+      forceHistorical?: boolean;
+      daysToFetch?: number;
+    } = {},
   ): Promise<FundingRateData[]> {
+    const { forceHistorical = false, daysToFetch = 7 } = options;
     const currentTime = new Date();
     let allRates: FundingRateData[] = [];
 
@@ -51,7 +56,8 @@ export class ExtendedFetcher {
           symbol,
           exchangeId,
         );
-        if (latestTimestamp) {
+
+        if (!forceHistorical && latestTimestamp) {
           const timeSinceLastUpdate =
             currentTime.getTime() - latestTimestamp.getTime();
           if (timeSinceLastUpdate < this.UPDATE_THRESHOLD) {
@@ -63,8 +69,12 @@ export class ExtendedFetcher {
         }
 
         const startTime =
-          latestTimestamp ||
-          new Date(currentTime.getTime() - 24 * 60 * 60 * 1000);
+          latestTimestamp && !forceHistorical
+            ? latestTimestamp
+            : new Date(
+                currentTime.getTime() - daysToFetch * 24 * 60 * 60 * 1000,
+              );
+
         const url = new URL(`${this.baseUrl}/api/v1/info/${symbol}/funding`);
         url.searchParams.append("startTime", startTime.getTime().toString());
         url.searchParams.append("endTime", currentTime.getTime().toString());
