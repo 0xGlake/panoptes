@@ -123,7 +123,10 @@ const ChartComponent = () => {
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
       <div id="charts-container" className="w-full max-w-4xl space-y-8">
         {exchanges.map((exchange) => (
-          <div key={exchange.id} className="border rounded shadow-lg p-4">
+          <div
+            key={exchange.id}
+            className="border rounded shadow-lg p-4 flex flex-col items-center"
+          >
             <h2 className="text-xl font-bold mb-4">{exchange.name}</h2>
             <div id={`chart-${exchange.id}`} />
           </div>
