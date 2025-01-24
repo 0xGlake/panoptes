@@ -1,4 +1,3 @@
-// app/api/funding-rates/route.ts
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 
@@ -9,16 +8,34 @@ export async function GET(request: Request) {
   const symbol = searchParams.get("symbol");
 
   try {
-    const rates = await prisma.fundingRate.findMany({
-      where: {
-        symbol: symbol || undefined,
-      },
-      orderBy: {
-        timestamp: "asc",
+    const exchanges = await prisma.exchange.findMany({
+      include: {
+        fundingRates: {
+          where: {
+            symbol: symbol || undefined,
+          },
+          orderBy: {
+            timestamp: "asc",
+          },
+        },
       },
     });
 
-    return NextResponse.json(rates);
+    // Transform the data to a more suitable format
+    const response = exchanges.map((exchange) => ({
+      id: exchange.id,
+      name: exchange.name,
+      rates: exchange.fundingRates.map((rate) => ({
+        id: rate.id,
+        timestamp: rate.timestamp,
+        rate: rate.rate,
+        symbol: rate.symbol,
+        createdAt: rate.createdAt,
+        updatedAt: rate.updatedAt,
+      })),
+    }));
+
+    return NextResponse.json(response);
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch funding rates with error: " + error },
