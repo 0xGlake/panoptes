@@ -4,6 +4,38 @@ import { ExtendedFetcher } from "../utils/exchangeDataFetcher.js";
 
 const prisma = new PrismaClient();
 
+interface MarketInfo {
+  name: string;
+  active: boolean;
+  status: string;
+}
+
+interface ExtendedMarketsResponse {
+  status: string;
+  data: MarketInfo[];
+}
+
+async function getActiveMarkets(): Promise<string[]> {
+  try {
+    const response = await fetch(
+      "https://api.extended.exchange/api/v1/info/markets",
+    );
+    const data = (await response.json()) as ExtendedMarketsResponse;
+
+    if (data.status !== "OK") {
+      throw new Error("Failed to fetch markets data");
+    }
+
+    // Filter for active markets and extract their names
+    return data.data
+      .filter((market) => market.active && market.status === "ACTIVE")
+      .map((market) => market.name);
+  } catch (error) {
+    console.error("Error fetching markets:", error);
+    throw error;
+  }
+}
+
 async function updateFundingRatesOnDeploy() {
   console.log("Starting funding rates update as part of deployment...");
 
@@ -15,14 +47,17 @@ async function updateFundingRatesOnDeploy() {
     });
 
     const extendedFetcher = new ExtendedFetcher();
-    const symbols = ["BTC-USD", "ETH-USD", "SOL-USD"];
+
+    // Get active markets dynamically instead of using hardcoded symbols
+    const symbols = await getActiveMarkets();
+    console.log(`Found ${symbols.length} active markets`);
 
     const rates = await extendedFetcher.fetchHistoricalFundingRates(
       symbols,
       exchange.id,
       {
-        forceHistorical: true, // Set to true to force historical data fetch
-        daysToFetch: 90, // Fetch 7 days of historical data
+        forceHistorical: true,
+        daysToFetch: 90,
       },
     );
 

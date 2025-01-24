@@ -74,7 +74,7 @@ const ChartComponent = () => {
       // Create chart
       const chart = createChart(container, {
         width: 800,
-        height: 400,
+        height: 800,
         layout: {
           background: { color: "#ffffff" },
           textColor: "#333",
