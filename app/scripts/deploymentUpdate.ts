@@ -15,14 +15,14 @@ async function updateFundingRatesOnDeploy() {
     });
 
     const extendedFetcher = new ExtendedFetcher();
-    const symbols = ["BTC-USD", "ETH-USD"];
+    const symbols = ["BTC-USD", "ETH-USD", "SOL-USD"];
 
     const rates = await extendedFetcher.fetchHistoricalFundingRates(
       symbols,
       exchange.id,
       {
-        forceHistorical: false, // Set to true to force historical data fetch
-        daysToFetch: 1, // Fetch 7 days of historical data
+        forceHistorical: true, // Set to true to force historical data fetch
+        daysToFetch: 90, // Fetch 7 days of historical data
       },
     );
 
