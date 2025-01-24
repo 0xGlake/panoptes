@@ -95,7 +95,7 @@ export class ExtendedFetcher {
 
         const rates = data.data.map((item) => ({
           timestamp: new Date(item.T),
-          rate: parseFloat(item.f),
+          rate: parseFloat(item.f) * 24 * 365,
           symbol: item.m,
         }));
 
@@ -107,13 +107,34 @@ export class ExtendedFetcher {
       }
     }
 
+    // Store the rates with the forceHistorical flag
+    await this.storeFundingRates(allRates, exchangeId, forceHistorical);
+
     return allRates;
   }
 
-  async storeFundingRates(rates: FundingRateData[], exchangeId: string) {
+  async storeFundingRates(
+    rates: FundingRateData[],
+    exchangeId: string,
+    forceHistorical: boolean = false,
+  ) {
     if (rates.length === 0) return;
 
     try {
+      if (forceHistorical) {
+        // Get unique symbols from the rates array
+        const symbols = [...new Set(rates.map((rate) => rate.symbol))];
+
+        // Delete existing data for these symbols
+        await prisma.fundingRate.deleteMany({
+          where: {
+            symbol: { in: symbols },
+            exchangeId: exchangeId,
+          },
+        });
+      }
+
+      // Store new data
       await prisma.fundingRate.createMany({
         data: rates.map((rate) => ({
           timestamp: rate.timestamp,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createChart, IChartApi, LineStyle } from "lightweight-charts";
+import { createChart, IChartApi } from "lightweight-charts";
 
 interface FundingRate {
   id: string;
@@ -57,7 +57,7 @@ const ChartComponent = () => {
     Object.values(chartsRef.current).forEach((chart) => chart.remove());
     chartsRef.current = {};
 
-    exchanges.forEach((exchange, exchangeIndex) => {
+    exchanges.forEach((exchange) => {
       // Get unique symbols for this exchange
       const symbols = [...new Set(exchange.rates.map((rate) => rate.symbol))];
 
