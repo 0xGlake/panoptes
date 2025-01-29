@@ -66,8 +66,19 @@ https://tradingview.github.io/lightweight-charts/tutorials
   - [ ] get order book depth for extended for estimating cost of placing short
 - [ ] display live prices from web socket of extended and rengegade (no historic, candle stick)
   - [ ] display the mark delta as line
+- [ ] Integrate zeta perps or raydium perps or jupiter perps
+  - [ ] look into JLP strategy
 
-##
+## futarchy arb
 - [ ] display the delta between pass/fail markets and mark price of spot asset
   - [ ] https://github.com/metaDAOproject/futarchy-sdk
   - [ ] https://github.com/metaDAOproject/hermes/blob/main/src/swap.ts
+
+## pumpfun AI analyst
+- [ ] get latest graduated pump fun's (monitor raydium pools neding in pump?)
+- [ ] pull necessary links and metadata
+  - [ ] twitter
+  - [ ] description
+- [ ] aggregate all the data into single json text block
+- [ ] create a prompt for analysing bullishness/bearishness and give score to buy or not
+- [ ] automate buying
