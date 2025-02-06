@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi } from "lightweight-charts";
 import MarketCards from "./components/MarketCards";
+import CandlestickChart from "./components/CandlestickChart";
 
 interface FundingRate {
   id: string;
@@ -169,6 +170,16 @@ const ChartComponent = () => {
               <div id={`chart-${exchange.id}`} />
 
               <MarketCards symbols={symbols} marketData={marketData} />
+
+              <CandlestickChart
+                symbols={[
+                  ...new Set(
+                    exchanges.flatMap((exchange) =>
+                      exchange.rates.map((rate) => rate.symbol),
+                    ),
+                  ),
+                ]}
+              />
             </div>
           );
         })}
