@@ -33,6 +33,20 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [currentSymbol, setCurrentSymbol] = useState<string>("");
+
+  const resetChart = () => {
+    // Clear existing data
+    if (seriesRef.current) {
+      seriesRef.current.setData([]);
+    }
+    // Reset connection status
+    setConnectionStatus("disconnected");
+    // Close existing WebSocket
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+  };
 
   // Handle search and suggestions
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,9 +64,13 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
   };
 
   const handleSelectSymbol = (symbol: string) => {
-    setSearchTerm(symbol);
-    setShowSuggestions(false);
-    initializeWebSocket(symbol);
+    if (currentSymbol !== symbol) {
+      resetChart();
+      setCurrentSymbol(symbol);
+      setSearchTerm(symbol);
+      setShowSuggestions(false);
+      initializeWebSocket(symbol);
+    }
   };
 
   // WebSocket handling
@@ -76,16 +94,30 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
       ws.onmessage = (event) => {
         try {
           const response: StreamResponse = JSON.parse(event.data);
-          const candleData = response.data.map((candle) => ({
-            time: candle.T / 1000, // Convert to seconds
-            open: parseFloat(candle.o),
-            low: parseFloat(candle.l),
-            high: parseFloat(candle.h),
-            close: parseFloat(candle.c),
-          }));
+          console.log("Received candle data:", response.data); // Debug log
 
-          if (seriesRef.current && candleData.length > 0) {
-            seriesRef.current.update(candleData[0]);
+          if (response.data.length > 0) {
+            const candle = response.data[0];
+            console.log("Processing candle:", {
+              time: new Date(candle.T).toISOString(),
+              open: candle.o,
+              high: candle.h,
+              low: candle.l,
+              close: candle.c,
+              volume: candle.v,
+            });
+
+            const candleData = {
+              time: candle.T / 1000,
+              open: parseFloat(candle.o),
+              low: parseFloat(candle.l),
+              high: parseFloat(candle.h),
+              close: parseFloat(candle.c),
+            };
+
+            if (seriesRef.current) {
+              seriesRef.current.update(candleData);
+            }
           }
         } catch (error) {
           console.error("Error processing message:", error);
@@ -129,12 +161,20 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
         },
       });
 
-      const candlestickSeries = chart.addCandlestickSeries();
+      const candlestickSeries = chart.addCandlestickSeries({
+        upColor: "#26a69a",
+        downColor: "#ef5350",
+        borderVisible: false,
+        wickUpColor: "#26a69a",
+        wickDownColor: "#ef5350",
+      });
+
       chartRef.current = chart;
       seriesRef.current = candlestickSeries;
     }
 
     return () => {
+      resetChart();
       if (chartRef.current) {
         chartRef.current.remove();
         chartRef.current = null;
@@ -146,15 +186,13 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
   // Cleanup
   useEffect(() => {
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      resetChart();
     };
   }, []);
 
   return (
     <div className="flex flex-col items-center w-full max-w-4xl">
-      <div className="relative w-full max-w-md mb-4">
+      <div className="relative w-full max-w-md mb-4 text-gray-800">
         <input
           type="text"
           value={searchTerm}

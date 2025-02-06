@@ -122,7 +122,7 @@ const ChartComponent = () => {
         );
         const lineSeries = chart.addLineSeries({
           color: COLORS[symbolIndex % COLORS.length],
-          lineWidth: 2,
+          lineWidth: 1,
           title: symbol,
         });
 
