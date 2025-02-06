@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi } from "lightweight-charts";
+import MarketCards from "./components/MarketCards";
 
 interface FundingRate {
   id: string;
@@ -151,17 +152,6 @@ const ChartComponent = () => {
     });
   };
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("en-US", {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    }).format(num);
-  };
-
-  const formatPercentage = (num: number) => {
-    return `${num}%`;
-  };
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
       <div id="charts-container" className="w-full max-w-4xl space-y-8">
@@ -169,7 +159,6 @@ const ChartComponent = () => {
           const symbols = [
             ...new Set(exchange.rates.map((rate) => rate.symbol)),
           ];
-          const sortedSymbols = getSortedSymbols(symbols, marketData);
 
           return (
             <div
@@ -179,65 +168,7 @@ const ChartComponent = () => {
               <h2 className="text-xl font-bold mb-4">{exchange.name}</h2>
               <div id={`chart-${exchange.id}`} />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 w-full">
-                {sortedSymbols.map((symbol) => {
-                  const stats = marketData[symbol];
-                  if (!stats) return null;
-
-                  return (
-                    <div
-                      key={symbol}
-                      className="bg-white rounded-lg shadow p-4 border"
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-semibold text-lg text-gray-900">
-                          {symbol}
-                        </h3>
-                        <span
-                          className={`px-2 py-1 rounded text-sm ${
-                            stats.status === "ACTIVE"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {stats.status}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-gray-900">Open Interest</span>
-                          <span className="font-medium text-gray-500">
-                            ${formatNumber(stats.openInterest)}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between">
-                          <span className="text-gray-900">Daily Volume</span>
-                          <span className="font-medium text-gray-500">
-                            ${formatNumber(stats.dailyVolume)}
-                          </span>
-                        </div>
-
-                        {/* <div className="flex justify-between">
-                            <span className="text-gray-600">
-                              Next Funding Rate
-                            </span>
-                            <span
-                              className={`font-medium ${
-                                stats.nextFundingRate > 0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}
-                            >
-                              {formatPercentage(stats.nextFundingRate)}
-                            </span>
-                          </div> */}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <MarketCards symbols={symbols} marketData={marketData} />
             </div>
           );
         })}
