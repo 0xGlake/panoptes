@@ -58,15 +58,19 @@ https://tradingview.github.io/lightweight-charts/tutorials
 ## cash carry trade todo
 - [ ] display historic funding rates from extended exchange (line graph)
   - [ ] https://api.extended.exchange/api/v1/info/markets - for getting market tickers and fees
-  - [ ] https://api.docs.extended.exchange/#get-funding-rates-history - for funding history
-  - [ ] https://api.docs.extended.exchange/#get-candles-history - for mark prices
+    - [x] get market tickers
+    - [ ] optional: display 24hr volume to gauge interest (marketStats.dailyVolume) and open interest (marketStats.openInterest)
+  - [x] https://api.docs.extended.exchange/#get-funding-rates-history - for funding history
 - [ ] an input box which tells you how much fees you'll pay for X size position (split in half for delta neutral)
   - [ ] is funding paid in base asset or quote currency
   - [ ] estimated APY to be paid based on current funding rate
   - [ ] get order book depth for extended for estimating cost of placing short
+  - [ ] add option to add leveraged positions
+    - [ ] liquidation price
 - [ ] display live prices from web socket of extended and rengegade (no historic, candle stick)
   - [ ] display the mark delta as line
-- [ ] Integrate zeta perps or raydium perps or jupiter perps
+  - [ ] displau current market delta as text
+- [ ] future ntegrations: zeta perps, raydium perps, jupiter perps, adrena perps
   - [ ] look into JLP strategy
 
 ## futarchy arb

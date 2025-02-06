@@ -46,7 +46,7 @@ export class ExtendedFetcher {
       daysToFetch?: number;
     } = {},
   ): Promise<FundingRateData[]> {
-    const { forceHistorical = false, daysToFetch = 7 } = options;
+    const { forceHistorical = false, daysToFetch = 14 } = options; // change these options to force fetch historic data
     const currentTime = new Date();
     let allRates: FundingRateData[] = [];
 
