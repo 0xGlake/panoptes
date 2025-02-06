@@ -163,7 +163,7 @@ const ChartComponent = () => {
           return (
             <div
               key={exchange.id}
-              className="border rounded shadow-lg p-4 flex flex-col items-center"
+              className="rounded shadow-lg p-4 flex flex-col items-center"
             >
               <h2 className="text-xl font-bold mb-4">{exchange.name}</h2>
               <div id={`chart-${exchange.id}`} />

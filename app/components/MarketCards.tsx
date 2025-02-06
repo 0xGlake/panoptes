@@ -47,7 +47,7 @@ const MarketCards = ({ symbols, marketData }: MarketCardsProps) => {
         className="w-5/12 flex items-center justify-between p-2 bg-gray-100 rounded-lg mb-2 hover:bg-gray-200 transition-colors"
       >
         <span className="font-medium text-gray-700">
-          Renegade Market Statistics
+          Extended Market Statistics
         </span>
         {isExpanded ? (
           <span className="text-gray-600">Hide</span>
