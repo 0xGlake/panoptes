@@ -56,10 +56,10 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 https://tradingview.github.io/lightweight-charts/tutorials
 
 ## cash carry trade todo
-- [ ] display historic funding rates from extended exchange (line graph)
-  - [ ] https://api.extended.exchange/api/v1/info/markets - for getting market tickers and fees
+- [x] display historic funding rates from extended exchange (line graph)
+  - [x] https://api.extended.exchange/api/v1/info/markets - for getting market tickers and fees
     - [x] get market tickers
-    - [ ] optional: display 24hr volume to gauge interest (marketStats.dailyVolume) and open interest (marketStats.openInterest)
+    - [x] optional: display 24hr volume to gauge interest (marketStats.dailyVolume) and open interest (marketStats.openInterest)
   - [x] https://api.docs.extended.exchange/#get-funding-rates-history - for funding history
 - [ ] an input box which tells you how much fees you'll pay for X size position (split in half for delta neutral)
   - [ ] is funding paid in base asset or quote currency
@@ -68,6 +68,8 @@ https://tradingview.github.io/lightweight-charts/tutorials
   - [ ] add option to add leveraged positions
     - [ ] liquidation price
 - [ ] display live prices from web socket of extended and rengegade (no historic, candle stick)
+  - [ ] display extended mark prices from websocket
+  - [ ] display renegade mark prices from websocket
   - [ ] display the mark delta as line
   - [ ] displau current market delta as text
 - [ ] future ntegrations: zeta perps, raydium perps, jupiter perps, adrena perps
