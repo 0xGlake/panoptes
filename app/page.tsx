@@ -5,6 +5,8 @@ import { createChart, IChartApi } from "lightweight-charts";
 import MarketCards from "./components/MarketCards";
 import CandlestickChart from "./components/CandlestickChart";
 import PriceStreamer from "./components/RenegadeTest";
+import RenegadeCandlestickChart from "./components/RenegadeCandlestickChart";
+import { TOKENS } from "./types/tokens";
 
 interface FundingRate {
   id: string;
@@ -186,6 +188,7 @@ const ChartComponent = () => {
         })}
       </div>
       <PriceStreamer />
+      <RenegadeCandlestickChart tokens={TOKENS} />
     </div>
   );
 };
