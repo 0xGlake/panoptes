@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi } from "lightweight-charts";
 import MarketCards from "./components/MarketCards";
 import CandlestickChart from "./components/CandlestickChart";
-import WBTCPrice from "./components/RenegadeTest";
+import PriceStreamer from "./components/RenegadeTest";
 
 interface FundingRate {
   id: string;
@@ -185,7 +185,7 @@ const ChartComponent = () => {
           );
         })}
       </div>
-      <WBTCPrice />
+      <PriceStreamer />
     </div>
   );
 };
