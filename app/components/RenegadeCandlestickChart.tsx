@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi, ISeriesApi } from "lightweight-charts";
 import useWebSocket, { ReadyState } from "react-use-websocket";
-import { TOKENS } from "../types/tokens";
 
-interface CandleStick {
+// Import TOKENS from your existing RenegadeTest component
+import { TOKENS } from "./RenegadeTest"; // Adjust import path as needed
+
+interface Candle {
   time: number;
   open: number;
   high: number;
@@ -11,93 +13,24 @@ interface CandleStick {
   close: number;
 }
 
-interface CurrentCandle {
-  open: number;
-  high: number;
-  low: number;
-  prices: number[];
-  startTime: number;
-}
-
-const RenegadeCandlestickChart: React.FC<{ tokens: typeof TOKENS }> = ({
-  tokens,
-}) => {
-  const [selectedToken, setSelectedToken] = useState(tokens[2]); // Default to WBTC
+const RenegadeCandlestickChart: React.FC = () => {
+  const [selectedToken, setSelectedToken] = useState(TOKENS[2]); // Default to WBTC
+  const [currentCandle, setCurrentCandle] = useState<Candle | null>(null);
+  const [candles, setCandles] = useState<Candle[]>([]);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const currentCandleRef = useRef<CurrentCandle | null>(null);
-  const [candlesticks, setCandlesticks] = useState<CandleStick[]>([]);
 
   // WebSocket connection
   const { readyState, lastMessage } = useWebSocket(
     "wss://mainnet.price-reporter.renegade.fi:4000",
     {
       share: true,
-      onMessage: (event) => {
-        try {
-          if (event.data.startsWith("InvalidPairInfo")) return;
-
-          const data = JSON.parse(event.data);
-          if (!data || !data.price) return;
-
-          updateCandle(data.price);
-        } catch (error) {
-          console.error("Error processing message:", error);
-        }
-      },
       shouldReconnect: () => true,
+      reconnectInterval: 3000,
+      reconnectAttempts: 10,
     },
   );
-
-  const updateCandle = (price: number) => {
-    const now = Date.now();
-    const currentMinute = Math.floor(now / 60000) * 60000;
-
-    if (
-      !currentCandleRef.current ||
-      currentCandleRef.current.startTime < currentMinute
-    ) {
-      // Create new candle
-      if (currentCandleRef.current) {
-        // Save the previous candle
-        const newCandle: CandleStick = {
-          time: currentCandleRef.current.startTime / 1000,
-          open: currentCandleRef.current.open,
-          high: currentCandleRef.current.high,
-          low: currentCandleRef.current.low,
-          close:
-            currentCandleRef.current.prices[
-              currentCandleRef.current.prices.length - 1
-            ],
-        };
-        setCandlesticks((prev) => [...prev, newCandle]);
-        if (seriesRef.current) {
-          seriesRef.current.update(newCandle);
-        }
-      }
-
-      // Start new candle
-      currentCandleRef.current = {
-        open: price,
-        high: price,
-        low: price,
-        prices: [price],
-        startTime: currentMinute,
-      };
-    } else {
-      // Update current candle
-      currentCandleRef.current.high = Math.max(
-        currentCandleRef.current.high,
-        price,
-      );
-      currentCandleRef.current.low = Math.min(
-        currentCandleRef.current.low,
-        price,
-      );
-      currentCandleRef.current.prices.push(price);
-    }
-  };
 
   // Initialize chart
   useEffect(() => {
@@ -129,58 +62,126 @@ const RenegadeCandlestickChart: React.FC<{ tokens: typeof TOKENS }> = ({
 
       chartRef.current = chart;
       seriesRef.current = candlestickSeries;
-    }
 
-    return () => {
-      if (chartRef.current) {
-        chartRef.current.remove();
-        chartRef.current = null;
-        seriesRef.current = null;
-      }
-    };
+      return () => {
+        chart.remove();
+      };
+    }
   }, []);
 
-  // Subscribe to WebSocket when token changes
+  // Subscribe to price feed when token changes
   useEffect(() => {
     if (readyState === ReadyState.OPEN) {
-      const USDT = tokens.find((t) => t.ticker === "USDT")!;
+      const USDT = TOKENS.find((t) => t.ticker === "USDT")!;
       const topic = `binance-${selectedToken.address}-${USDT.address}`;
       const subscribeMessage = {
         method: "subscribe",
         topic,
       };
 
-      // Reset current data
-      currentCandleRef.current = null;
-      setCandlesticks([]);
+      // Reset candles when changing tokens
+      setCandles([]);
+      setCurrentCandle(null);
+
       if (seriesRef.current) {
         seriesRef.current.setData([]);
       }
+
+      console.log("Subscribing to:", topic);
+      // Send subscription message
+      if (webSocket.current) {
+        webSocket.current.send(JSON.stringify(subscribeMessage));
+      }
     }
-  }, [readyState, selectedToken, tokens]);
+  }, [readyState, selectedToken]);
+
+  // Process incoming messages and update candles
+  useEffect(() => {
+    if (!lastMessage?.data) return;
+
+    try {
+      const data = JSON.parse(lastMessage.data);
+      if (!data.price) return;
+
+      const currentTime = Math.floor(Date.now() / 1000);
+      const minuteStart = currentTime - (currentTime % 60);
+
+      if (!currentCandle || currentCandle.time !== minuteStart) {
+        // Start new candle
+        if (currentCandle) {
+          setCandles((prev) => [...prev, currentCandle]);
+        }
+
+        setCurrentCandle({
+          time: minuteStart,
+          open: data.price,
+          high: data.price,
+          low: data.price,
+          close: data.price,
+        });
+      } else {
+        // Update current candle
+        setCurrentCandle((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            high: Math.max(prev.high, data.price),
+            low: Math.min(prev.low, data.price),
+            close: data.price,
+          };
+        });
+      }
+    } catch (error) {
+      console.error("Error processing message:", error);
+    }
+  }, [lastMessage]);
+
+  // Update chart with new candles
+  useEffect(() => {
+    if (seriesRef.current) {
+      const allCandles = [...candles];
+      if (currentCandle) {
+        allCandles.push(currentCandle);
+      }
+      seriesRef.current.setData(allCandles);
+    }
+  }, [candles, currentCandle]);
 
   return (
-    <div className="p-4 rounded-lg bg-gray-800 text-white">
-      <div className="mb-4">
+    <div className="flex flex-col items-center w-full max-w-4xl">
+      <div className="mb-4 w-full max-w-md">
         <select
-          className="w-full p-2 rounded bg-gray-700 text-white"
+          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
           value={selectedToken.ticker}
           onChange={(e) => {
-            const token = tokens.find((t) => t.ticker === e.target.value);
+            const token = TOKENS.find((t) => t.ticker === e.target.value);
             if (token) setSelectedToken(token);
           }}
         >
-          {tokens.map((token) => (
+          {TOKENS.map((token) => (
             <option key={token.ticker} value={token.ticker}>
               {token.name} ({token.ticker})
             </option>
           ))}
         </select>
       </div>
-      <div ref={containerRef} className="mt-4" />
-      <div className="text-sm text-gray-400 mt-2">
-        Status: {ReadyState[readyState]}
+
+      <div className="mb-2">
+        Status:{" "}
+        <span
+          className={`px-2 py-1 rounded ${
+            readyState === ReadyState.OPEN
+              ? "bg-green-500"
+              : readyState === ReadyState.CONNECTING
+                ? "bg-yellow-500"
+                : "bg-red-500"
+          } text-white`}
+        >
+          {ReadyState[readyState]}
+        </span>
       </div>
+
+      <div ref={containerRef} className="border border-gray-700 rounded" />
     </div>
   );
 };
