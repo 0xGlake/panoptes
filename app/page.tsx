@@ -188,7 +188,7 @@ const ChartComponent = () => {
         })}
       </div>
       <PriceStreamer />
-      <RenegadeCandlestickChart tokens={TOKENS} />
+      <RenegadeCandlestickChart />
     </div>
   );
 };
