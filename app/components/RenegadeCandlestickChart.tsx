@@ -17,7 +17,6 @@ const RenegadeCandlestickChart: React.FC = () => {
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const currentCandleRef = useRef<CandleData | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const currentTopicRef = useRef<string>("");
 
   const { sendMessage, readyState, lastMessage } = useWebSocket(
@@ -179,10 +178,7 @@ const RenegadeCandlestickChart: React.FC = () => {
         </select>
       </div>
 
-      <div className="mb-2 text-white">
-        Status: {ReadyState[readyState]}
-        {error && <div className="text-red-500 mt-2">{error}</div>}
-      </div>
+      <div className="mb-2 text-white">Status: {ReadyState[readyState]}</div>
 
       <div ref={containerRef} className="border rounded shadow-lg" />
     </div>
