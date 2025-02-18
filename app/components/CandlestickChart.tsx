@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi, ISeriesApi, Time } from "lightweight-charts";
 
-interface TradeData {
-  m: string;
-  S: string;
-  tT: string;
-  T: number;
-  p: string;
-  q: string;
-  i: number;
-}
+// interface TradeData {
+//   m: string;
+//   S: string;
+//   tT: string;
+//   T: number;
+//   p: string;
+//   q: string;
+//   i: number;
+// }
 
-interface OrderBookData {
-  m: string;
-  b: Array<{ p: string; q: string }>;
-  a: Array<{ p: string; q: string }>;
-}
+// interface OrderBookData {
+//   m: string;
+//   b: Array<{ p: string; q: string }>;
+//   a: Array<{ p: string; q: string }>;
+// }
 
 interface CandleData {
   time: Time;
@@ -26,6 +26,10 @@ interface CandleData {
 }
 
 const WS_BASE_URL = "wss://api.extended.exchange";
+
+interface Props {
+  symbols: string[];
+}
 
 const CandlestickChart: React.FC<Props> = ({ symbols }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -62,7 +66,9 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
     setSearchTerm(value);
 
     if (value) {
-      const filtered = symbols.filter((symbol) => symbol.includes(value));
+      const filtered = symbols.filter((symbol: string) =>
+        symbol.includes(value),
+      );
       setSuggestions(filtered);
       setShowSuggestions(true);
     } else {
@@ -193,13 +199,13 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
         },
       });
 
-      const candlestickSeries = chart.addCandlestickSeries({
-        upColor: "#26a69a",
-        downColor: "#ef5350",
-        borderVisible: false,
-        wickUpColor: "#26a69a",
-        wickDownColor: "#ef5350",
-      });
+      // const candlestickSeries = chart.addCandlestickSeries({
+      //   upColor: "#26a69a",
+      //   downColor: "#ef5350",
+      //   borderVisible: false,
+      //   wickUpColor: "#26a69a",
+      //   wickDownColor: "#ef5350",
+      // });
 
       // Add bid-ask lines
       const bidLine = chart.addLineSeries({
@@ -215,7 +221,7 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
       });
 
       chartRef.current = chart;
-      seriesRef.current = candlestickSeries;
+      // seriesRef.current = candlestickSeries;
       bidLineRef.current = bidLine;
       askLineRef.current = askLine;
     }

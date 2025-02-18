@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi } from "lightweight-charts";
 import MarketCards from "./components/MarketCards";
 import CandlestickChart from "./components/CandlestickChart";
-import PriceStreamer from "./components/RenegadeTest";
 import RenegadeCandlestickChart from "./components/RenegadeCandlestickChart";
-import { TOKENS } from "./types/tokens";
+import RenegadeExtendedArb from "./components/RenegadeExtendedArb";
 
 interface FundingRate {
   id: string;
@@ -83,6 +82,7 @@ const ChartComponent = () => {
     exchanges.forEach((exchange) => {
       // Get unique symbols for this exchange
       const symbols = [...new Set(exchange.rates.map((rate) => rate.symbol))];
+      console.log(symbols);
 
       // Create container for this exchange's chart if it doesn't exist
       const containerId = `chart-${exchange.id}`;
@@ -142,20 +142,6 @@ const ChartComponent = () => {
     });
   }, [exchanges]);
 
-  const getSortedSymbols = (symbols: string[], marketData: MarketData) => {
-    return [...symbols].sort((a, b) => {
-      const statsA = marketData[a];
-      const statsB = marketData[b];
-
-      // Handle cases where market data might not exist
-      if (!statsA) return 1;
-      if (!statsB) return -1;
-
-      // Sort by open interest in descending order
-      return statsB.openInterest - statsA.openInterest;
-    });
-  };
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
       <div id="charts-container" className="w-full max-w-4xl space-y-8">
@@ -187,8 +173,8 @@ const ChartComponent = () => {
           );
         })}
       </div>
-      <PriceStreamer />
       <RenegadeCandlestickChart />
+      <RenegadeExtendedArb />
     </div>
   );
 };
