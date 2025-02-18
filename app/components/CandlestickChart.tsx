@@ -1,23 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { createChart, IChartApi, ISeriesApi } from "lightweight-charts";
+import { createChart, IChartApi, ISeriesApi, Time } from "lightweight-charts";
+
+interface TradeData {
+  m: string;
+  S: string;
+  tT: string;
+  T: number;
+  p: string;
+  q: string;
+  i: number;
+}
+
+interface OrderBookData {
+  m: string;
+  b: Array<{ p: string; q: string }>;
+  a: Array<{ p: string; q: string }>;
+}
 
 interface CandleData {
-  T: number;
-  o: string;
-  l: string;
-  h: string;
-  c: string;
-  v: string;
-}
-
-interface StreamResponse {
-  ts: number;
-  data: CandleData[];
-  seq: number;
-}
-
-interface Props {
-  symbols: string[];
+  time: Time;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
 }
 
 const WS_BASE_URL = "wss://api.extended.exchange";
@@ -34,6 +39,9 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [currentSymbol, setCurrentSymbol] = useState<string>("");
+  const currentCandleRef = useRef<CandleData | null>(null);
+  const bidLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const askLineRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   const resetChart = () => {
     // Clear existing data
@@ -69,72 +77,96 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
       setCurrentSymbol(symbol);
       setSearchTerm(symbol);
       setShowSuggestions(false);
-      initializeWebSocket(symbol);
+      initializeWebSockets(symbol);
     }
   };
 
   // WebSocket handling
-  const initializeWebSocket = (symbol: string) => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
+  const initializeWebSockets = (symbol: string) => {
+    // Close existing connections
+    resetChart();
     setConnectionStatus("connecting");
 
     try {
-      const ws = new WebSocket(
-        `${WS_BASE_URL}/stream.extended.exchange/v1/candles/${symbol}/trades?interval=PT1M`,
+      // Create WebSocket for trades
+      const tradesWs = new WebSocket(
+        `${WS_BASE_URL}/stream.extended.exchange/v1/publicTrades/${symbol}`,
       );
 
-      ws.onopen = () => {
-        console.log("WebSocket connected");
-        setConnectionStatus("connected");
-      };
+      // Create WebSocket for orderbook
+      const orderbookWs = new WebSocket(
+        `${WS_BASE_URL}/stream.extended.exchange/v1/orderbooks/${symbol}?depth=1`,
+      );
 
-      ws.onmessage = (event) => {
+      tradesWs.onmessage = (event) => {
         try {
-          const response: StreamResponse = JSON.parse(event.data);
-          console.log("Received candle data:", response.data); // Debug log
-
+          const response = JSON.parse(event.data);
           if (response.data.length > 0) {
-            const candle = response.data[0];
-            console.log("Processing candle:", {
-              time: new Date(candle.T).toISOString(),
-              open: candle.o,
-              high: candle.h,
-              low: candle.l,
-              close: candle.c,
-              volume: candle.v,
-            });
+            const trade = response.data[0];
+            const price = parseFloat(trade.p);
+            const timestamp = Math.floor(trade.T / 1000);
+            const minuteStart = timestamp - (timestamp % 60);
 
-            const candleData = {
-              time: candle.T / 1000,
-              open: parseFloat(candle.o),
-              low: parseFloat(candle.l),
-              high: parseFloat(candle.h),
-              close: parseFloat(candle.c),
-            };
+            if (
+              !currentCandleRef.current ||
+              currentCandleRef.current.time !== (minuteStart as Time)
+            ) {
+              // Start new candle
+              if (currentCandleRef.current) {
+                seriesRef.current?.update(currentCandleRef.current);
+              }
 
-            if (seriesRef.current) {
-              seriesRef.current.update(candleData);
+              currentCandleRef.current = {
+                time: minuteStart as Time,
+                open: price,
+                high: price,
+                low: price,
+                close: price,
+              };
+            } else {
+              // Update current candle
+              currentCandleRef.current.high = Math.max(
+                currentCandleRef.current.high,
+                price,
+              );
+              currentCandleRef.current.low = Math.min(
+                currentCandleRef.current.low,
+                price,
+              );
+              currentCandleRef.current.close = price;
             }
+
+            seriesRef.current?.update(currentCandleRef.current);
           }
         } catch (error) {
-          console.error("Error processing message:", error);
+          console.error("Error processing trade:", error);
         }
       };
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setConnectionStatus("error");
+      orderbookWs.onmessage = (event) => {
+        try {
+          const response = JSON.parse(event.data);
+          if (response.data) {
+            const timestamp = Math.floor(response.ts / 1000);
+            const bid = parseFloat(response.data.b[0].p);
+            const ask = parseFloat(response.data.a[0].p);
+
+            bidLineRef.current?.update({ time: timestamp as Time, value: bid });
+            askLineRef.current?.update({ time: timestamp as Time, value: ask });
+          }
+        } catch (error) {
+          console.error("Error processing orderbook:", error);
+        }
       };
 
-      ws.onclose = () => {
-        console.log("WebSocket closed");
-        setConnectionStatus("disconnected");
-      };
+      // Handle connection states
+      [tradesWs, orderbookWs].forEach((ws) => {
+        ws.onopen = () => setConnectionStatus("connected");
+        ws.onerror = () => setConnectionStatus("error");
+        ws.onclose = () => setConnectionStatus("disconnected");
+      });
 
-      wsRef.current = ws;
+      wsRef.current = tradesWs; // Store reference for cleanup
     } catch (error) {
       console.error("Error creating WebSocket:", error);
       setConnectionStatus("error");
@@ -148,12 +180,12 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
         width: 800,
         height: 400,
         layout: {
-          background: { color: "#ffffff" },
-          textColor: "#333",
+          background: { color: "#1a1a1a" },
+          textColor: "#d1d4dc",
         },
         grid: {
-          vertLines: { color: "#f0f0f0" },
-          horzLines: { color: "#f0f0f0" },
+          vertLines: { color: "#2a2a2a" },
+          horzLines: { color: "#2a2a2a" },
         },
         timeScale: {
           timeVisible: true,
@@ -169,8 +201,23 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
         wickDownColor: "#ef5350",
       });
 
+      // Add bid-ask lines
+      const bidLine = chart.addLineSeries({
+        color: "#26a69a",
+        lineWidth: 1,
+        lineStyle: 2, // Dashed line
+      });
+
+      const askLine = chart.addLineSeries({
+        color: "#ef5350",
+        lineWidth: 1,
+        lineStyle: 2, // Dashed line
+      });
+
       chartRef.current = chart;
       seriesRef.current = candlestickSeries;
+      bidLineRef.current = bidLine;
+      askLineRef.current = askLine;
     }
 
     return () => {
@@ -179,6 +226,8 @@ const CandlestickChart: React.FC<Props> = ({ symbols }) => {
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
+        bidLineRef.current = null;
+        askLineRef.current = null;
       }
     };
   }, []);
