@@ -29,25 +29,25 @@ const COLORS = [
   "#607D8B",
 ];
 
-const ExtendedFundingRates = ({ exchanges }: { exchanges: Exchange[] }) => {
+const ExtendedFundingRates = ({
+  exchanges,
+  sortedSymbols,
+}: {
+  exchanges: Exchange[];
+  sortedSymbols: string[];
+}) => {
   const chartsRef = useRef<{ [key: string]: IChartApi }>({});
   const [selectedSymbols, setSelectedSymbols] = useState<{
     [key: string]: boolean;
   }>({});
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const allSymbols = [
-    ...new Set(
-      exchanges.flatMap((exchange) =>
-        exchange.rates.map((rate) => rate.symbol),
-      ),
-    ),
-  ];
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Initialize selected symbols
   useEffect(() => {
-    if (Object.keys(selectedSymbols).length === 0 && allSymbols.length > 0) {
-      const initial = allSymbols.reduce(
+    if (Object.keys(selectedSymbols).length === 0 && sortedSymbols.length > 0) {
+      const initial = sortedSymbols.reduce(
         (acc, symbol) => ({
           ...acc,
           [symbol]: true,
@@ -56,7 +56,7 @@ const ExtendedFundingRates = ({ exchanges }: { exchanges: Exchange[] }) => {
       );
       setSelectedSymbols(initial);
     }
-  }, [allSymbols]);
+  }, [sortedSymbols]);
 
   // Cleanup function
   useEffect(() => {
@@ -99,7 +99,7 @@ const ExtendedFundingRates = ({ exchanges }: { exchanges: Exchange[] }) => {
 
       const chart = createChart(container, {
         width: 800,
-        height: 800,
+        height: 600,
         layout: {
           background: { color: "#ffffff" },
           textColor: "#333",
@@ -146,31 +146,95 @@ const ExtendedFundingRates = ({ exchanges }: { exchanges: Exchange[] }) => {
     });
   }, [exchanges, selectedSymbols]);
 
+  const handleSelectAll = () => {
+    const newSelected = sortedSymbols.reduce(
+      (acc, symbol) => ({ ...acc, [symbol]: true }),
+      {},
+    );
+    setSelectedSymbols(newSelected);
+  };
+
+  const handleDeselectAll = () => {
+    const newSelected = sortedSymbols.reduce(
+      (acc, symbol) => ({ ...acc, [symbol]: false }),
+      {},
+    );
+    setSelectedSymbols(newSelected);
+  };
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Check if click is outside both the dropdown button and dropdown content
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        !(event.target as Element).closest(".dropdown-button")
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="w-full max-w-4xl">
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">
-          Select Markets to Display
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          {allSymbols.map((symbol) => (
-            <label key={symbol} className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={selectedSymbols[symbol] || false}
-                onChange={(e) =>
-                  setSelectedSymbols((prev) => ({
-                    ...prev,
-                    [symbol]: e.target.checked,
-                  }))
-                }
-                className="form-checkbox h-4 w-4 text-blue-600"
-              />
-              <span className="text-sm">{symbol}</span>
-            </label>
-          ))}
+      <div className="mb-6 relative">
+        <div className="flex items-center gap-4 mb-2">
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none dropdown-button" // Added dropdown-button class
+          >
+            Select Markets
+          </button>
+          <button
+            onClick={handleSelectAll}
+            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none"
+          >
+            Select All
+          </button>
+          <button
+            onClick={handleDeselectAll}
+            className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none"
+          >
+            Deselect All
+          </button>
         </div>
+
+        {isDropdownOpen && (
+          <div
+            ref={dropdownRef} // Added ref to dropdown content
+            className="absolute z-10 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg max-h-96 overflow-y-auto text-gray-600"
+          >
+            <div className="p-2">
+              {sortedSymbols.map((symbol) => (
+                <label
+                  key={symbol}
+                  className="flex items-center p-2 hover:bg-gray-300 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedSymbols[symbol] || false}
+                    onChange={(e) =>
+                      setSelectedSymbols((prev) => ({
+                        ...prev,
+                        [symbol]: e.target.checked,
+                      }))
+                    }
+                    className="form-checkbox h-4 w-4 text-blue-600"
+                  />
+                  <span className="ml-2 text-sm">{symbol}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
       <div ref={containerRef} className="space-y-8">
         {exchanges.map((exchange) => (
           <div key={exchange.id} className="rounded shadow-lg p-4">

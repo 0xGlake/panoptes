@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import MarketCards from "./components/MarketCards";
-// import CandlestickChart from "./components/CandlestickChart";
-// import RenegadeCandlestickChart from "./components/RenegadeCandlestickChart";
 import ExtendedFundingRates from "./components/ExtendedFundingRates";
 import RenegadeExtendedArb from "./components/RenegadeExtendedArb";
 
@@ -28,7 +26,7 @@ interface MarketData {
 }
 
 const ChartComponent = () => {
-  const [exchanges, setExchanges] = useState([]);
+  const [ratesData, setRatesData] = useState([]);
   const [marketData, setMarketData] = useState<MarketData>({});
 
   useEffect(() => {
@@ -42,7 +40,7 @@ const ChartComponent = () => {
         const ratesData = await ratesResponse.json();
         const marketStats = await marketResponse.json();
 
-        setExchanges(ratesData);
+        setRatesData(ratesData);
         setMarketData(marketStats);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -54,16 +52,31 @@ const ChartComponent = () => {
 
   const allSymbols = [
     ...new Set(
-      exchanges.flatMap((exchange) =>
+      ratesData.flatMap((exchange) =>
         exchange.rates.map((rate: FundingRate) => rate.symbol),
       ),
     ),
   ];
 
+  const getSortedSymbols = (symbols: string[], marketData: MarketData) => {
+    return [...symbols].sort((a, b) => {
+      const statsA = marketData[a];
+      const statsB = marketData[b];
+      if (!statsA) return 1;
+      if (!statsB) return -1;
+      return statsB.openInterest - statsA.openInterest;
+    });
+  };
+
+  const sortedSymbols = getSortedSymbols(allSymbols, marketData);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
-      <MarketCards symbols={allSymbols} marketData={marketData} />
-      <ExtendedFundingRates exchanges={exchanges} />
+      <MarketCards symbols={sortedSymbols} marketData={marketData} />
+      <ExtendedFundingRates
+        exchanges={ratesData}
+        sortedSymbols={sortedSymbols}
+      />
       <RenegadeExtendedArb />
     </div>
   );

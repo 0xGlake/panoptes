@@ -40,8 +40,6 @@ const RenegadeExtendedArb: React.FC = () => {
 
   // Initialize chart
   useEffect(() => {
-    TOKENS.map((token) => console.log(token.ticker));
-
     if (containerRef.current && !chartRef.current) {
       const chart = createChart(containerRef.current, {
         width: 800,
