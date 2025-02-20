@@ -182,9 +182,10 @@ const ExtendedFundingRates = ({
   }, []);
 
   return (
-    <div className="w-full max-w-4xl">
-      <div className="mb-6 relative">
-        <div className="flex items-center gap-4 mb-2">
+    <div className="w-full max-w-4xl flex flex-col items-center mb-4">
+      <h1>Extended Funding Rates</h1>
+      <div className="relative">
+        <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none dropdown-button" // Added dropdown-button class
@@ -238,7 +239,6 @@ const ExtendedFundingRates = ({
       <div ref={containerRef} className="space-y-8">
         {exchanges.map((exchange) => (
           <div key={exchange.id} className="rounded shadow-lg p-4">
-            <h2 className="text-xl font-bold mb-4">{exchange.name}</h2>
             <div id={`chart-${exchange.id}`} />
           </div>
         ))}

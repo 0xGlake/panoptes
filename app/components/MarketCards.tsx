@@ -41,10 +41,11 @@ const MarketCards = ({ symbols, marketData }: MarketCardsProps) => {
   const sortedSymbols = getSortedSymbols(symbols, marketData);
 
   return (
-    <div className="w-full pt-5">
+    <div className="w-full pt-5 flex flex-col items-center mb-4">
+      <h1>Extended Market Statistics</h1>
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-5/12 flex items-center justify-between p-2 bg-gray-100 rounded-lg mb-2 hover:bg-gray-200 transition-colors"
+        className="w-3/12 flex items-center justify-between p-2 bg-gray-100 rounded-lg mb-2 hover:bg-gray-200 transition-colors"
       >
         <span className="font-medium text-gray-700">
           Extended Market Statistics
@@ -57,7 +58,7 @@ const MarketCards = ({ symbols, marketData }: MarketCardsProps) => {
       </button>
 
       {isExpanded && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 size-10/12">
           {sortedSymbols.map((symbol) => {
             const stats = marketData[symbol];
             if (!stats) return null;
