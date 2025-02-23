@@ -27,7 +27,7 @@ const RenegadeExtendedArb: React.FC = () => {
     extendedAskLine: null,
   });
 
-  // Initialize chart
+  // Initialize chart, and reset on selected token change
   useEffect(() => {
     if (!containerRef.current || chartRefs.current.chart) return;
 
@@ -85,7 +85,7 @@ const RenegadeExtendedArb: React.FC = () => {
         extendedAskLine: null,
       };
     };
-  }, []);
+  }, [selectedToken]);
 
   // Renegade WebSocket
   const {
