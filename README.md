@@ -67,14 +67,12 @@ https://tradingview.github.io/lightweight-charts/tutorials
   - [ ] get order book depth for extended for estimating cost of placing short
   - [ ] add option to add leveraged positions
     - [ ] liquidation price
-- [ ] display live prices from web socket of extended and rengegade (no historic, candle stick)
+- [ ] display live prices from web socket of extended and rengegade
   - [x] display extended mark prices from websocket
-    - [ ] update to pull from orderbook websocket rather than candlestick websocket for more accurate info
+    - [x] update to pull from orderbook websocket rather than candlestick websocket for more accurate info
     - [ ] use horizontal lines to show largest pending orders size and price, heres ref: https://github.com/tradingview/lightweight-charts/issues/1063
     - [ ] depth=1 play with the depth of extended exchange
   - [x] display renegade mark prices from websocket
-  - [ ] display the mark delta as line graph
-  - [ ] display current market delta as text
 - [ ] future ntegrations: zeta perps, raydium perps, jupiter perps, adrena perps
   - [ ] look into JLP strategy
 
