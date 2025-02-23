@@ -42,6 +42,14 @@ const RenegadeExtendedArb: React.FC = () => {
         timeVisible: true,
         secondsVisible: false,
       },
+      grid: {
+        vertLines: {
+          color: "rgba(42, 46, 57, 0.3)", // More transparent grid lines
+        },
+        horzLines: {
+          color: "rgba(42, 46, 57, 0.3)", // More transparent grid lines
+        },
+      },
     });
 
     const renegadeLine = chart.addLineSeries({

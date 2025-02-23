@@ -131,6 +131,10 @@ const ExtendedFundingRates = ({
             color: COLORS[symbolIndex % COLORS.length],
             lineWidth: 1,
             title: symbol,
+            priceFormat: {
+              type: "percent",
+              precision: 2,
+            },
           });
 
           const chartData = symbolRates.map((rate) => ({
@@ -183,24 +187,26 @@ const ExtendedFundingRates = ({
 
   return (
     <div className="w-full max-w-4xl flex flex-col items-center mb-4">
-      <h1>Extended Funding Rates</h1>
+      <h1 className="text-4xl font-extrabold mb-2 text-[#068a63]">
+        Extended Funding Rates
+      </h1>
       <div className="relative">
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none dropdown-button" // Added dropdown-button class
+            className="px-4 py-2 bg-[#027352] text-white rounded-md hover:bg-gray-600 focus:outline-none dropdown-button"
           >
             Select Markets
           </button>
           <button
             onClick={handleSelectAll}
-            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none"
+            className="px-4 py-2 bg-[#027352] text-white rounded-md hover:bg-gray-600 focus:outline-none"
           >
             Select All
           </button>
           <button
             onClick={handleDeselectAll}
-            className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none"
+            className="px-4 py-2 bg-[#027352] text-white rounded-md hover:bg-gray-600 focus:outline-none"
           >
             Deselect All
           </button>
