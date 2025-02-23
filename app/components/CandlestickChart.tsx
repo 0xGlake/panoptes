@@ -1,22 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi, ISeriesApi, Time } from "lightweight-charts";
 
-// interface TradeData {
-//   m: string;
-//   S: string;
-//   tT: string;
-//   T: number;
-//   p: string;
-//   q: string;
-//   i: number;
-// }
-
-// interface OrderBookData {
-//   m: string;
-//   b: Array<{ p: string; q: string }>;
-//   a: Array<{ p: string; q: string }>;
-// }
-
 interface CandleData {
   time: Time;
   open: number;
