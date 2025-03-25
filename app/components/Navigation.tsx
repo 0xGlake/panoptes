@@ -10,6 +10,7 @@ const Navigation = () => {
     { name: "Markets", path: "/markets" },
     { name: "Funding Rates", path: "/funding-rates" },
     { name: "Arbitrage", path: "/arbitrage" },
+    { name: "TradingInterface", path: "/trading-interface" },
   ];
 
   return (
