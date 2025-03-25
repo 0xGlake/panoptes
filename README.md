@@ -89,3 +89,12 @@ https://tradingview.github.io/lightweight-charts/tutorials
 - [ ] aggregate all the data into single json text block
 - [ ] create a prompt for analysing bullishness/bearishness and give score to buy or not
 - [ ] automate buying
+
+## real-time news aggregator
+- [ ] RSS feed
+  - [ ] get a collection of important RSS feeds
+  - [ ] create a parser for feeds
+  - [ ] extract key info like asset names
+- [ ] Twitter aggregator
+  - [ ] create a collection of high value accounts
+  - [ ] create a parser for tweets

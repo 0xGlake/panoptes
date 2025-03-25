@@ -1,85 +1,58 @@
 "use client";
+import { ReactNode } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { useEffect, useState } from "react";
-import MarketCards from "./components/MarketCards";
-import ExtendedFundingRates from "./components/ExtendedFundingRates";
-import RenegadeExtendedArb from "./components/RenegadeExtendedArb";
-
-interface FundingRate {
-  id: string;
-  timestamp: string;
-  rate: number;
-  symbol: string;
-  createdAt: string;
-  updatedAt: string;
+interface DashboardLayoutProps {
+  children: ReactNode;
 }
 
-interface MarketStats {
-  openInterest: number;
-  dailyVolume: number;
-  nextFundingRate: number;
-  status: string;
-}
+const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+  const pathname = usePathname();
 
-interface MarketData {
-  [key: string]: MarketStats;
-}
-
-const ChartComponent = () => {
-  const [ratesData, setRatesData] = useState([]);
-  const [marketData, setMarketData] = useState<MarketData>({});
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ratesResponse, marketResponse] = await Promise.all([
-          fetch("/api/funding-rates"),
-          fetch("/api/extendedExchange"),
-        ]);
-
-        const ratesData = await ratesResponse.json();
-        const marketStats = await marketResponse.json();
-
-        setRatesData(ratesData);
-        setMarketData(marketStats);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  const allSymbols = [
-    ...new Set(
-      ratesData.flatMap((exchange) =>
-        exchange.rates.map((rate: FundingRate) => rate.symbol),
-      ),
-    ),
+  const navItems = [
+    { name: "Home", path: "/" },
+    { name: "Markets", path: "/markets" },
+    { name: "Funding Rates", path: "/funding-rates" },
+    { name: "Arbitrage", path: "/arbitrage" },
   ];
 
-  const getSortedSymbols = (symbols: string[], marketData: MarketData) => {
-    return [...symbols].sort((a, b) => {
-      const statsA = marketData[a];
-      const statsB = marketData[b];
-      if (!statsA) return 1;
-      if (!statsB) return -1;
-      return statsB.openInterest - statsA.openInterest;
-    });
-  };
-
-  const sortedSymbols = getSortedSymbols(allSymbols, marketData);
-
   return (
-    <div className="flex flex-col items-center w-full">
-      <MarketCards symbols={sortedSymbols} marketData={marketData} />
-      <ExtendedFundingRates
-        exchanges={ratesData}
-        sortedSymbols={sortedSymbols}
-      />
-      <RenegadeExtendedArb />
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <span className="text-xl font-bold text-gray-900">
+                  Crypto Dashboard
+                </span>
+              </div>
+              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    className={`${
+                      pathname === item.path
+                        ? "border-indigo-500 text-gray-900"
+                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">{children}</div>
+      </main>
     </div>
   );
 };
 
-export default ChartComponent;
+export default DashboardLayout;
