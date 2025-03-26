@@ -3,7 +3,6 @@ import {
   createChart,
   IChartApi,
   ISeriesApi,
-  Time,
   UTCTimestamp,
 } from "lightweight-charts";
 import useWebSocket, { ReadyState } from "react-use-websocket";
@@ -186,9 +185,6 @@ const TradingInterface: React.FC = () => {
             chartRefs.current.candles.push({
               ...chartRefs.current.currentCandle,
             });
-
-            // Update with the complete set of candles to avoid chart "snapping"
-            chartRefs.current.candleSeries.setData(chartRefs.current.candles);
           }
 
           // Start a new candle - use the last price as the opening price
@@ -216,6 +212,13 @@ const TradingInterface: React.FC = () => {
           // Always update close price
           candle.close = askPrice;
         }
+
+        // Update the series with live data
+        const updatedCandles = [...chartRefs.current.candles];
+        if (chartRefs.current.currentCandle) {
+          updatedCandles.push(chartRefs.current.currentCandle);
+        }
+        chartRefs.current.candleSeries.setData(updatedCandles);
 
         // Update the last price for the next update
         lastPrice.current = askPrice;
