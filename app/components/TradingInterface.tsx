@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   createChart,
   IChartApi,
   ISeriesApi,
   UTCTimestamp,
-  IPriceLine,
   LineStyle,
+  IPriceLine,
+  LineWidth,
 } from "lightweight-charts";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { ArbitrageToken, ARBITRAGE_TOKENS } from "../types/arbitrageTokens";
@@ -20,21 +21,25 @@ interface CandleData {
   close: number;
 }
 
-interface TradeMacroState {
+interface TradeLevel {
+  id: string;
+  type:
+    | "markBuy"
+    | "limitBuy"
+    | "limitSell"
+    | "takeP"
+    | "stopL"
+    | "liquidationP";
   active: boolean;
-  entryPrice: number | null;
-  entryLine: IPriceLine | null;
+  IpriceLine: IPriceLine;
 }
 
 const TradingInterface: React.FC = () => {
   const [selectedToken, setSelectedToken] = useState<ArbitrageToken>(
     ARBITRAGE_TOKENS[0],
   );
-  const [macroState, setMacroState] = useState<TradeMacroState>({
-    active: false,
-    entryPrice: null,
-    entryLine: null,
-  });
+  const [macroActive, setMacroActive] = useState(false);
+  const [tradeLevels, setTradeLevels] = useState<TradeLevel[]>([]);
 
   // Track if user has manually positioned the chart
   const userPositionedChart = useRef(false);
@@ -56,75 +61,82 @@ const TradingInterface: React.FC = () => {
     candles: [],
   });
 
-  // Handle Shift+T keypress to toggle trade macro mode
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.key === "T" && event.shiftKey) {
-      event.preventDefault();
-      setMacroState((prev) => ({
-        ...prev,
-        active: !prev.active,
-      }));
+  // Clear all trade levels
+  const clearAllTradeLevels = React.useCallback(() => {
+    // Remove price lines from chart
+    if (chartRefs.current.candleSeries) {
+      tradeLevels.forEach((level) => {
+        chartRefs.current.candleSeries?.removePriceLine(level.IpriceLine);
+      });
     }
-  }, []);
 
-  // Handle chart clicks for setting entry price when macro is active
-  const handleChartClick = useCallback(
-    (e: MouseEvent) => {
-      if (
-        !macroState.active ||
-        !chartRefs.current.chart ||
-        !chartRefs.current.candleSeries
-      ) {
-        return;
+    // Clear state
+    setTradeLevels([]);
+  }, [tradeLevels]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle macro mode with Shift+T
+      if (e.key === "T" && e.shiftKey) {
+        setMacroActive((prev) => !prev);
       }
 
-      // Get chart container dimensions and position
-      const chartContainer = containerRef.current;
-      if (!chartContainer) return;
+      // Clear all trade levels with Shift+C
+      if (e.key === "C" && e.shiftKey) {
+        clearAllTradeLevels();
+      }
+    };
 
-      const rect = chartContainer.getBoundingClientRect();
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [clearAllTradeLevels]);
 
-      // Calculate relative position within the chart
-      //const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+  // Handle chart clicks
+  const handleChartClick = React.useCallback(
+    (param: { point?: { x: number; y: number } }) => {
+      if (!macroActive || !param.point || !chartRefs.current.candleSeries)
+        return;
 
-      console.log("Click event:", {
-        clientY: e.clientY,
-        rectTop: rect.top,
-        relativeY: y,
-        containerHeight: rect.height,
-      });
+      // Convert the y-coordinate to price
+      const price = chartRefs.current.candleSeries.coordinateToPrice(
+        param.point.y,
+      );
 
-      // Convert chart-relative coordinates to price
-      const price = chartRefs.current.candleSeries.coordinateToPrice(y);
-
-      console.log("Calculated price:", price);
-
+      // Check if price is null before proceeding
       if (price === null) return;
 
-      // Rest of the function remains the same...
-      // Remove existing entry line if it exists
-      if (macroState.entryLine && chartRefs.current.candleSeries) {
-        chartRefs.current.candleSeries.removePriceLine(macroState.entryLine);
-      }
+      // Create unique ID for this trade level
+      const id = `level-${Date.now()}`;
 
-      // Create new entry line
-      const entryLine = chartRefs.current.candleSeries.createPriceLine({
+      // Create price line config
+      const lineConfig = {
         price: price,
         color: "#4CAF50",
-        lineWidth: 2,
+        lineWidth: 2 as LineWidth,
         lineStyle: LineStyle.Solid,
         axisLabelVisible: true,
-        title: "Entry",
-      });
+        title: `Entry: ${price.toFixed(2)}`,
+      };
 
-      setMacroState((prev) => ({
+      // Add price line to chart
+      const priceLine =
+        chartRefs.current.candleSeries.createPriceLine(lineConfig);
+
+      // Add to state
+      setTradeLevels((prev) => [
         ...prev,
-        entryPrice: price,
-        entryLine: entryLine,
-      }));
+        {
+          id: id,
+          type: "markBuy",
+          active: true,
+          IpriceLine: priceLine,
+        },
+      ]);
     },
-    [macroState.active, macroState.entryLine],
+    [macroActive],
   );
 
   // Initialize chart, and reset on container or token change
@@ -139,6 +151,7 @@ const TradingInterface: React.FC = () => {
     // Reset tracking variables
     userPositionedChart.current = false;
     lastPrice.current = null;
+    setTradeLevels([]);
 
     // Create new chart
     const chart = createChart(containerRef.current, {
@@ -195,6 +208,9 @@ const TradingInterface: React.FC = () => {
       candles: [],
     };
 
+    // Subscribe to chart clicks
+    chart.subscribeClick(handleChartClick);
+
     // Detect when user manually positions the chart
     chart.timeScale().subscribeVisibleTimeRangeChange(() => {
       userPositionedChart.current = true;
@@ -219,43 +235,13 @@ const TradingInterface: React.FC = () => {
     // Auto-fit content initially
     chart.timeScale().fitContent();
 
-    // Reset macro state
-    setMacroState({
-      active: false,
-      entryPrice: null,
-      entryLine: null,
-    });
-
     return () => {
       window.removeEventListener("resize", handleResize);
-    };
-  }, [selectedToken]);
-
-  // Set up event listeners for keyboard and mouse
-  useEffect(() => {
-    document.addEventListener("keydown", handleKeyDown);
-
-    const containerElement = containerRef.current;
-    if (containerElement) {
-      containerElement.addEventListener("click", handleChartClick);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      if (containerElement) {
-        containerElement.removeEventListener("click", handleChartClick);
+      if (chartRefs.current.chart) {
+        chartRefs.current.chart.unsubscribeClick(handleChartClick);
       }
     };
-  }, [handleKeyDown, handleChartClick]);
-
-  // Update cursor style based on macro mode
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.style.cursor = macroState.active
-        ? "crosshair"
-        : "default";
-    }
-  }, [macroState.active]);
+  }, [selectedToken, handleChartClick]);
 
   // Extended exchange WebSocket connection
   const { lastMessage: extendedMessage, readyState: extendedReadyState } =
@@ -393,27 +379,24 @@ const TradingInterface: React.FC = () => {
 
       <div
         ref={containerRef}
-        className="w-full border border-gray-700 rounded shadow-lg bg-gray-900 relative"
+        className={`w-full border border-gray-700 rounded shadow-lg bg-gray-900 ${
+          macroActive ? "cursor-crosshair" : ""
+        }`}
       />
-
-      {macroState.active && (
-        <div className="w-full bg-blue-900 text-white p-2 text-sm rounded mt-1 mb-1 text-center">
-          Trading Macro Mode Active - Click to set entry price
-          {macroState.entryPrice !== null && (
-            <span className="ml-2 font-bold">
-              Entry: {macroState.entryPrice.toFixed(4)}
-            </span>
-          )}
-        </div>
-      )}
 
       <div className="w-full mt-2 text-xs text-gray-400 flex justify-between items-center">
         <span>1 Minute Candles - Ask Price</span>
-        <div className="flex space-x-4">
-          <span className="text-gray-300">
-            Press <kbd className="bg-gray-700 px-2 py-1 rounded">Shift+T</kbd>{" "}
-            to toggle trading macro
-          </span>
+        <div className="flex gap-2">
+          <button
+            className={`px-2 py-1 rounded ${
+              macroActive
+                ? "bg-green-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+            onClick={() => setMacroActive((prev) => !prev)}
+          >
+            {macroActive ? "Trading Macro: Active" : "Activate Trading Macro"}
+          </button>
           <button
             className="text-blue-400 hover:text-blue-300"
             onClick={() => {
@@ -425,8 +408,75 @@ const TradingInterface: React.FC = () => {
           >
             Reset View
           </button>
+          {tradeLevels.length > 0 && (
+            <button
+              className="text-red-400 hover:text-red-300"
+              onClick={clearAllTradeLevels}
+            >
+              Clear Levels
+            </button>
+          )}
         </div>
       </div>
+
+      {macroActive && (
+        <div className="w-full mt-2 bg-blue-900/20 border border-blue-700/30 rounded p-2 text-sm">
+          <p className="text-blue-300 font-medium">Trading Macro Active</p>
+          <p className="text-xs text-blue-200">
+            Click on the chart to place an entry level
+          </p>
+          <p className="text-xs text-blue-200 mt-1">
+            <span className="bg-gray-800 px-1 rounded">Shift+T</span> to toggle
+            macro mode |
+            <span className="bg-gray-800 px-1 rounded ml-1">Shift+C</span> to
+            clear all levels
+          </p>
+        </div>
+      )}
+
+      {tradeLevels.length > 0 && (
+        <div className="w-full mt-2">
+          <h3 className="text-sm font-medium text-gray-300 mb-1">
+            Trade Levels
+          </h3>
+          <div className="space-y-1">
+            {tradeLevels.map((level) => (
+              <div
+                key={level.id}
+                className="flex items-center justify-between bg-gray-800 rounded px-2 py-1"
+              >
+                <div className="flex items-center">
+                  <div
+                    className="w-3 h-3 rounded-full mr-2"
+                    style={{
+                      backgroundColor: level.IpriceLine.options().color,
+                    }}
+                  ></div>
+                  <span className="text-sm text-gray-200">
+                    Entry: {level.IpriceLine.options().price}
+                  </span>
+                </div>
+                <button
+                  className="text-red-400 hover:text-red-300 text-xs"
+                  onClick={() => {
+                    // Remove this specific level
+                    if (chartRefs.current.candleSeries) {
+                      chartRefs.current.candleSeries.removePriceLine(
+                        level.IpriceLine,
+                      );
+                    }
+                    setTradeLevels((prev) =>
+                      prev.filter((item) => item.id !== level.id),
+                    );
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
