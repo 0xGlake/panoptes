@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   createChart,
   IChartApi,
   ISeriesApi,
   UTCTimestamp,
+  IPriceLine,
+  LineStyle,
 } from "lightweight-charts";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { ArbitrageToken, ARBITRAGE_TOKENS } from "../types/arbitrageTokens";
@@ -18,10 +20,21 @@ interface CandleData {
   close: number;
 }
 
+interface TradeMacroState {
+  active: boolean;
+  entryPrice: number | null;
+  entryLine: IPriceLine | null;
+}
+
 const TradingInterface: React.FC = () => {
   const [selectedToken, setSelectedToken] = useState<ArbitrageToken>(
     ARBITRAGE_TOKENS[0],
   );
+  const [macroState, setMacroState] = useState<TradeMacroState>({
+    active: false,
+    entryPrice: null,
+    entryLine: null,
+  });
 
   // Track if user has manually positioned the chart
   const userPositionedChart = useRef(false);
@@ -42,6 +55,77 @@ const TradingInterface: React.FC = () => {
     currentCandle: null,
     candles: [],
   });
+
+  // Handle Shift+T keypress to toggle trade macro mode
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.key === "T" && event.shiftKey) {
+      event.preventDefault();
+      setMacroState((prev) => ({
+        ...prev,
+        active: !prev.active,
+      }));
+    }
+  }, []);
+
+  // Handle chart clicks for setting entry price when macro is active
+  const handleChartClick = useCallback(
+    (e: MouseEvent) => {
+      if (
+        !macroState.active ||
+        !chartRefs.current.chart ||
+        !chartRefs.current.candleSeries
+      ) {
+        return;
+      }
+
+      // Get chart container dimensions and position
+      const chartContainer = containerRef.current;
+      if (!chartContainer) return;
+
+      const rect = chartContainer.getBoundingClientRect();
+
+      // Calculate relative position within the chart
+      //const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      console.log("Click event:", {
+        clientY: e.clientY,
+        rectTop: rect.top,
+        relativeY: y,
+        containerHeight: rect.height,
+      });
+
+      // Convert chart-relative coordinates to price
+      const price = chartRefs.current.candleSeries.coordinateToPrice(y);
+
+      console.log("Calculated price:", price);
+
+      if (price === null) return;
+
+      // Rest of the function remains the same...
+      // Remove existing entry line if it exists
+      if (macroState.entryLine && chartRefs.current.candleSeries) {
+        chartRefs.current.candleSeries.removePriceLine(macroState.entryLine);
+      }
+
+      // Create new entry line
+      const entryLine = chartRefs.current.candleSeries.createPriceLine({
+        price: price,
+        color: "#4CAF50",
+        lineWidth: 2,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: "Entry",
+      });
+
+      setMacroState((prev) => ({
+        ...prev,
+        entryPrice: price,
+        entryLine: entryLine,
+      }));
+    },
+    [macroState.active, macroState.entryLine],
+  );
 
   // Initialize chart, and reset on container or token change
   useEffect(() => {
@@ -135,10 +219,43 @@ const TradingInterface: React.FC = () => {
     // Auto-fit content initially
     chart.timeScale().fitContent();
 
+    // Reset macro state
+    setMacroState({
+      active: false,
+      entryPrice: null,
+      entryLine: null,
+    });
+
     return () => {
       window.removeEventListener("resize", handleResize);
     };
   }, [selectedToken]);
+
+  // Set up event listeners for keyboard and mouse
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+
+    const containerElement = containerRef.current;
+    if (containerElement) {
+      containerElement.addEventListener("click", handleChartClick);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (containerElement) {
+        containerElement.removeEventListener("click", handleChartClick);
+      }
+    };
+  }, [handleKeyDown, handleChartClick]);
+
+  // Update cursor style based on macro mode
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.style.cursor = macroState.active
+        ? "crosshair"
+        : "default";
+    }
+  }, [macroState.active]);
 
   // Extended exchange WebSocket connection
   const { lastMessage: extendedMessage, readyState: extendedReadyState } =
@@ -276,22 +393,39 @@ const TradingInterface: React.FC = () => {
 
       <div
         ref={containerRef}
-        className="w-full border border-gray-700 rounded shadow-lg bg-gray-900"
+        className="w-full border border-gray-700 rounded shadow-lg bg-gray-900 relative"
       />
+
+      {macroState.active && (
+        <div className="w-full bg-blue-900 text-white p-2 text-sm rounded mt-1 mb-1 text-center">
+          Trading Macro Mode Active - Click to set entry price
+          {macroState.entryPrice !== null && (
+            <span className="ml-2 font-bold">
+              Entry: {macroState.entryPrice.toFixed(4)}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="w-full mt-2 text-xs text-gray-400 flex justify-between items-center">
         <span>1 Minute Candles - Ask Price</span>
-        <button
-          className="text-blue-400 hover:text-blue-300"
-          onClick={() => {
-            if (chartRefs.current.chart) {
-              chartRefs.current.chart.timeScale().fitContent();
-              userPositionedChart.current = false;
-            }
-          }}
-        >
-          Reset View
-        </button>
+        <div className="flex space-x-4">
+          <span className="text-gray-300">
+            Press <kbd className="bg-gray-700 px-2 py-1 rounded">Shift+T</kbd>{" "}
+            to toggle trading macro
+          </span>
+          <button
+            className="text-blue-400 hover:text-blue-300"
+            onClick={() => {
+              if (chartRefs.current.chart) {
+                chartRefs.current.chart.timeScale().fitContent();
+                userPositionedChart.current = false;
+              }
+            }}
+          >
+            Reset View
+          </button>
+        </div>
       </div>
     </div>
   );
