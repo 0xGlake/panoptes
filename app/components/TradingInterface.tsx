@@ -40,6 +40,7 @@ const TradingInterface: React.FC = () => {
   );
   const [macroActive, setMacroActive] = useState(false);
   const [tradeLevels, setTradeLevels] = useState<TradeLevel[]>([]);
+  const macroActiveRef = useRef(false);
 
   // Track if user has manually positioned the chart
   const userPositionedChart = useRef(false);
@@ -94,10 +95,18 @@ const TradingInterface: React.FC = () => {
     };
   }, [clearAllTradeLevels]);
 
+  useEffect(() => {
+    macroActiveRef.current = macroActive;
+  }, [macroActive]);
+
   // Handle chart clicks
   const handleChartClick = React.useCallback(
     (param: { point?: { x: number; y: number } }) => {
-      if (!macroActive || !param.point || !chartRefs.current.candleSeries)
+      if (
+        !macroActiveRef.current ||
+        !param.point ||
+        !chartRefs.current.candleSeries
+      )
         return;
 
       // Convert the y-coordinate to price
@@ -136,7 +145,7 @@ const TradingInterface: React.FC = () => {
         },
       ]);
     },
-    [macroActive],
+    [],
   );
 
   // Initialize chart, and reset on container or token change
