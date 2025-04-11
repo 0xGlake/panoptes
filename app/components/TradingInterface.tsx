@@ -21,15 +21,18 @@ interface CandleData {
   close: number;
 }
 
+type tradeType =
+  | "markBuy"
+  | "markSell"
+  | "limitBuy"
+  | "limitSell"
+  | "takeP"
+  | "stopL"
+  | "liquidationP";
+
 interface TradeLevel {
   id: string;
-  type:
-    | "markBuy"
-    | "limitBuy"
-    | "limitSell"
-    | "takeP"
-    | "stopL"
-    | "liquidationP";
+  type: tradeType;
   active: boolean;
   IpriceLine: IPriceLine;
 }
@@ -268,6 +271,8 @@ const TradingInterface: React.FC = () => {
   useEffect(() => {
     if (!extendedMessage?.data || !chartRefs.current.candleSeries) return;
 
+    console.log(extendedMessage);
+
     try {
       const data = JSON.parse(extendedMessage.data);
 
@@ -429,23 +434,27 @@ const TradingInterface: React.FC = () => {
       </div>
 
       {macroActive && (
-        <div className="w-full mt-2 bg-blue-900/20 border border-blue-700/30 rounded p-2 text-sm">
-          <p className="text-blue-300 font-medium">Trading Macro Active</p>
-          <p className="text-xs text-blue-200">
+        <div className="w-full mt-2 bg-blue-900/20 border border-blue-700/30 rounded p-2 text-sm text-gray-800">
+          <p className="text-gray-800 font-medium">Trading Macro Active</p>
+          <p className="text-xs text-gray-600">
             Click on the chart to place an entry level
           </p>
-          <p className="text-xs text-blue-200 mt-1">
-            <span className="bg-gray-800 px-1 rounded">Shift+T</span> to toggle
-            macro mode |
-            <span className="bg-gray-800 px-1 rounded ml-1">Shift+C</span> to
-            clear all levels
+          <p className="text-xs text-gray-800 mt-1">
+            <span className="bg-gray-800 px-1 rounded text-gray-300">
+              Shift+T
+            </span>{" "}
+            to toggle macro mode |
+            <span className="bg-gray-800 px-1 rounded ml-1 text-gray-300">
+              Shift+C
+            </span>{" "}
+            to clear all levels
           </p>
         </div>
       )}
 
       {tradeLevels.length > 0 && (
         <div className="w-full mt-2">
-          <h3 className="text-sm font-medium text-gray-300 mb-1">
+          <h3 className="text-sm font-medium text-gray-600 mb-1">
             Trade Levels
           </h3>
           <div className="space-y-1">
