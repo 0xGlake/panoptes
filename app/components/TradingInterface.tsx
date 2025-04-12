@@ -10,6 +10,7 @@ import {
 } from "lightweight-charts";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { ArbitrageToken, ARBITRAGE_TOKENS } from "../types/arbitrageTokens";
+import TradeFlowFactory from "./TradeFlowFactory";
 
 const WS_BASE_URL = "wss://api.extended.exchange";
 
@@ -90,6 +91,91 @@ const TradingInterface: React.FC = () => {
     // Clear state
     setTradeLevels([]);
   }, [tradeLevels]);
+
+  const executeTradeFlow = (tradeFlow: TradeFlow) => {
+    console.log("Executing trade flow:", tradeFlow);
+
+    // Example implementation for handling trade flow execution
+    // This assumes you have a price to work with from the chart
+    if (!chartRefs.current.candleSeries || lastPrice.current === null) {
+      console.error(
+        "Cannot execute trade flow - chart or price data not available",
+      );
+      return;
+    }
+
+    const currentPrice = lastPrice.current;
+
+    // Process each trade in the flow
+    tradeFlow.trades.forEach((trade) => {
+      // Extract components of the trade string
+      const tradeType = trade.includes("perp") ? "perp" : "spot";
+      const placement = trade.includes("mark") ? "mark" : "limit";
+
+      const isBuy = trade.includes("Buy");
+      const isSell = trade.includes("Sell");
+      const isTakeProfit = trade.includes("takeP");
+      const isStopLoss = trade.includes("stopL");
+
+      // Set appropriate color based on trade type
+      let color = "#4CAF50"; // Default green for buy
+      let title = "Entry";
+
+      if (isSell) {
+        color = "#ef5350"; // Red for sell
+        title = "Entry (Sell)";
+      } else if (isTakeProfit) {
+        color = "#2196F3"; // Blue for take profit
+        title = "Take Profit";
+      } else if (isStopLoss) {
+        color = "#FF9800"; // Orange for stop loss
+        title = "Stop Loss";
+      }
+
+      // Calculate price based on trade type
+      // In a real implementation, you'd use more sophisticated logic
+      // This is just an example
+      let priceOffset = 0;
+
+      if (isBuy || isSell) {
+        priceOffset = 0; // At current price
+      } else if (isTakeProfit) {
+        priceOffset = isBuy ? 200 : -200; // 200 points above for buy, below for sell
+      } else if (isStopLoss) {
+        priceOffset = isBuy ? -100 : 100; // 100 points below for buy, above for sell
+      }
+
+      const price = currentPrice + priceOffset;
+
+      // Create price line config
+      const lineConfig = {
+        price: price,
+        color: color,
+        lineWidth: 2 as LineWidth,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: `${title}: ${price.toFixed(2)}`,
+      };
+
+      // Add price line to chart
+      const priceLine =
+        chartRefs.current.candleSeries?.createPriceLine(lineConfig);
+
+      if (priceLine) {
+        // Add to state
+        setTradeLevels((prev) => [
+          ...prev,
+          {
+            id: `level-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: trade,
+            active: true,
+            quantity: 1,
+            IpriceLine: priceLine,
+          },
+        ]);
+      }
+    });
+  };
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -509,6 +595,7 @@ const TradingInterface: React.FC = () => {
           </div>
         </div>
       )}
+      <TradeFlowFactory onExecuteTradeFlow={executeTradeFlow} />
     </div>
   );
 };
