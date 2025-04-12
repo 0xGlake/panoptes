@@ -25,12 +25,16 @@ type TradeType = "perp" | "spot";
 
 type TradePlacement = "mark" | "limit";
 
-type TradeDecorator = "Buy" | "Sell" | "takeP" | "stopL";
+type TradeDirection = "buy" | "sell";
+
+type TradeSpecialAction = "takeP" | "stopL";
+
+type TradeDecorator = TradeDirection | TradeSpecialAction;
+
+// todo: will need to think about how liquidatioP is handled for perps
 
 // Combined trade type, perpLiquidationP is specifically for setting perps liquidation price
-type Trade =
-  | `${TradeType}${TradePlacement}${TradeDecorator}`
-  | `perpLiquidationP`;
+type Trade = `${TradeType}${TradePlacement}${TradeDecorator}`;
 
 interface TradeLevel {
   id: string;
@@ -151,7 +155,7 @@ const TradingInterface: React.FC = () => {
         ...prev,
         {
           id: id,
-          type: "perpmarkBuy",
+          type: "perpmarkbuy",
           active: true,
           quantity: 1,
           IpriceLine: priceLine,
