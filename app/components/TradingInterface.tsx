@@ -21,20 +21,29 @@ interface CandleData {
   close: number;
 }
 
-type tradeType =
-  | "markBuy"
-  | "markSell"
-  | "limitBuy"
-  | "limitSell"
-  | "takeP"
-  | "stopL"
-  | "liquidationP";
+type TradeType = "perp" | "spot";
+
+type TradePlacement = "mark" | "limit";
+
+type TradeDecorator = "Buy" | "Sell" | "takeP" | "stopL";
+
+// Combined trade type, perpLiquidationP is specifically for setting perps liquidation price
+type Trade =
+  | `${TradeType}${TradePlacement}${TradeDecorator}`
+  | `perpLiquidationP`;
 
 interface TradeLevel {
   id: string;
-  type: tradeType;
+  type: Trade;
   active: boolean;
+  quantity: number;
   IpriceLine: IPriceLine;
+}
+
+interface TradeFlow {
+  id: string;
+  macro: string;
+  trades: Trade[];
 }
 
 const TradingInterface: React.FC = () => {
@@ -142,8 +151,9 @@ const TradingInterface: React.FC = () => {
         ...prev,
         {
           id: id,
-          type: "markBuy",
+          type: "perpmarkBuy",
           active: true,
+          quantity: 1,
           IpriceLine: priceLine,
         },
       ]);
