@@ -26,46 +26,91 @@ export const useTradingChart = (
 
   // Initialize chart
   const initChart = useCallback(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) {
+      console.log("Container ref not available");
+      return;
+    }
 
     // Clean up previous chart if it exists
     if (chartRef.current) {
-      chartRef.current.remove();
+      try {
+        // Make sure to unsubscribe the click handler before removing
+        if (onChartClick) {
+          chartRef.current.unsubscribeClick(onChartClick);
+        }
+        chartRef.current.remove();
+      } catch (error) {
+        console.error("Error removing old chart:", error);
+      }
       chartRef.current = null;
       seriesRef.current = null;
     }
 
-    // Create new chart
-    const chart = createChart(containerRef.current, chartOptions);
-    const candleSeries = chart.addCandlestickSeries(seriesOptions);
+    console.log("Creating new chart...");
 
-    // Store references
-    chartRef.current = chart;
-    seriesRef.current = candleSeries;
+    try {
+      // Create new chart
+      const chart = createChart(containerRef.current, {
+        ...chartOptions,
+        width: containerRef.current.clientWidth || 800,
+        height: 400,
+      });
 
-    // Subscribe to chart clicks if handler provided
-    if (onChartClick) {
-      chart.subscribeClick(onChartClick);
+      const candleSeries = chart.addCandlestickSeries(seriesOptions);
+
+      // Store references
+      chartRef.current = chart;
+      seriesRef.current = candleSeries;
+
+      // Subscribe to chart clicks if handler provided
+      if (onChartClick) {
+        console.log("Subscribing to chart click events");
+        chart.subscribeClick(onChartClick);
+
+        // Log a test click to verify the handler is working
+        console.log("Chart click handler attached, testing...");
+        setTimeout(() => {
+          const testClick = { point: { x: 100, y: 100 } };
+          console.log("Simulating click:", testClick);
+          // This is just to log, not actually trigger the click
+        }, 500);
+      }
+
+      // Start with empty candles
+      candleSeries.setData([]);
+
+      // Auto-fit content initially
+      chart.timeScale().fitContent();
+
+      return {
+        chart,
+        candleSeries,
+      };
+    } catch (error) {
+      console.error("Error creating chart:", error);
+      return null;
     }
-
-    // Start with empty candles
-    candleSeries.setData([]);
-
-    // Auto-fit content initially
-    chart.timeScale().fitContent();
-
-    return {
-      chart,
-      candleSeries,
-    };
   }, [containerRef, chartOptions, seriesOptions, onChartClick]);
 
   // Handle resize
   const handleResize = useCallback(() => {
     if (containerRef.current && chartRef.current) {
-      chartRef.current.applyOptions({
-        width: containerRef.current.clientWidth,
-      });
+      try {
+        const newWidth = containerRef.current.clientWidth;
+        console.log("Resizing chart to width:", newWidth);
+        chartRef.current.applyOptions({
+          width: newWidth,
+        });
+        // Force a redraw
+        chartRef.current
+          .timeScale()
+          .scrollToPosition(
+            chartRef.current.timeScale().scrollPosition(),
+            false,
+          );
+      } catch (error) {
+        console.error("Error resizing chart:", error);
+      }
     }
   }, [containerRef]);
 

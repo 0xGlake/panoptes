@@ -110,7 +110,7 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
 
   // Add a trade level
   const addTradeLevel = useCallback((level: Omit<TradeLevel, "id">) => {
-    const id = `level-${Date.now()}`;
+    const id = `level-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     setTradeLevels((prev) => [...prev, { ...level, id }]);
   }, []);
 
@@ -119,7 +119,11 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
     setTradeLevels((prev) => {
       const level = prev.find((l) => l.id === id);
       if (level && chartSeriesRef.current) {
-        chartSeriesRef.current.removePriceLine(level.IpriceLine);
+        try {
+          chartSeriesRef.current.removePriceLine(level.IpriceLine);
+        } catch (error) {
+          console.error("Error removing price line:", error);
+        }
       }
       return prev.filter((l) => l.id !== id);
     });
@@ -129,7 +133,11 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
   const clearAllTradeLevels = useCallback(() => {
     if (chartSeriesRef.current) {
       tradeLevels.forEach((level) => {
-        chartSeriesRef.current?.removePriceLine(level.IpriceLine);
+        try {
+          chartSeriesRef.current?.removePriceLine(level.IpriceLine);
+        } catch (error) {
+          console.error("Error removing price line:", error);
+        }
       });
     }
     setTradeLevels([]);

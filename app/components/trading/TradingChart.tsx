@@ -31,17 +31,21 @@ export const TradingChart: React.FC = () => {
     tradeFlows,
     addTradeLevel,
     setActiveTradeFlowStep,
-    setActiveTradeFlow,
+    activateTradeFlow,
     calculatePresetPrice,
   } = useTradingContext();
 
   // Status message for the current trade flow step
   const [statusMessage, setStatusMessage] = useState<string>("");
 
+  // Track orders that have been placed to prevent duplicates
+  const [placedOrderTypes, setPlacedOrderTypes] = useState<Set<string>>(
+    new Set(),
+  );
+
   // Track if user has manually positioned the chart
   const userPositionedChart = useRef(false);
   const lastPriceRef = useRef<number | null>(null);
-  const hasInitializedChart = useRef(false);
 
   // Container ref for chart
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,11 +61,16 @@ export const TradingChart: React.FC = () => {
     candles: [],
   });
 
-  // Initialize chart with our custom hook
-  const { chartRef, seriesRef, initChart, handleResize } = useTradingChart(
-    containerRef,
-    // Chart options
-    {
+  // Reset order tracking when a new flow is activated
+  useEffect(() => {
+    if (activeTradeFlow) {
+      setPlacedOrderTypes(new Set());
+    }
+  }, [activeTradeFlow]);
+
+  // Chart options
+  const chartOptions = useMemo(
+    () => ({
       width: containerRef.current?.clientWidth || 800,
       height: 400,
       layout: {
@@ -89,85 +98,22 @@ export const TradingChart: React.FC = () => {
           style: 2,
         },
       },
-    },
-    // Candle series options
-    {
+    }),
+    [],
+  );
+
+  // Candle series options
+  const candleSeriesOptions = useMemo(
+    () => ({
       upColor: "#26a69a",
       downColor: "#ef5350",
       borderUpColor: "#26a69a",
       borderDownColor: "#ef5350",
       wickUpColor: "#26a69a",
       wickDownColor: "#ef5350",
-    },
-    { onChartClick: handleChartClick },
+    }),
+    [],
   );
-
-  // Handle chart clicks - declare function reference before usage
-  function handleChartClick(param: { point?: { x: number; y: number } }) {
-    if (!param.point || !seriesRef.current) return;
-
-    // Convert the y-coordinate to price
-    const price = seriesRef.current.coordinateToPrice(param.point.y);
-    if (price === null) return;
-
-    // Only process clicks if there's an active flow
-    if (!activeTradeFlow) return;
-
-    const flow = tradeFlows.find((f) => f.id === activeTradeFlow);
-    if (!flow) return;
-
-    const step = activeTradeFlowStep;
-    const trade = flow.trades[step];
-    if (!trade) return;
-
-    // Skip market entry placements - these should be placed automatically
-    if (step === 0 && trade.includes("mark")) return;
-
-    // Handle limit order placement or take profit/stop loss placement
-    // Determine color and title based on trade type
-    let color = "#4CAF50"; // Default green for entries
-    let title = "Limit Entry";
-
-    if (trade.includes("takeP")) {
-      color = "#2196F3"; // Blue for take profit
-      title = "Take Profit";
-    } else if (trade.includes("stopL")) {
-      color = "#FF9800"; // Orange for stop loss
-      title = "Stop Loss";
-    }
-
-    // Create price line config
-    const lineConfig = {
-      price: price,
-      color: color,
-      lineWidth: 2 as LineWidth,
-      lineStyle: LineStyle.Solid,
-      axisLabelVisible: true,
-      title: `${title}: ${price.toFixed(2)}`,
-    };
-
-    // Add price line to chart
-    const priceLine = seriesRef.current.createPriceLine(lineConfig);
-
-    // Add to context state
-    addTradeLevel({
-      type: trade,
-      active: true,
-      quantity: 1,
-      IpriceLine: priceLine,
-    });
-
-    // Move to next step or deactivate flow
-    if (step < flow.trades.length - 1) {
-      setActiveTradeFlowStep(step + 1);
-      updateStatusMessage(flow, step + 1);
-    } else {
-      // Last step completed - exit macro mode
-      setActiveTradeFlowStep(0);
-      setActiveTradeFlow(null);
-      setStatusMessage("");
-    }
-  }
 
   // Function to update status message based on current flow and step
   const updateStatusMessage = useCallback((flow: TradeFlow, step: number) => {
@@ -180,7 +126,11 @@ export const TradingChart: React.FC = () => {
 
     if (trade.includes("mark")) {
       setStatusMessage("Market entry will be placed automatically");
-    } else if (trade.includes("limit")) {
+    } else if (
+      trade.includes("limit") &&
+      !trade.includes("takeP") &&
+      !trade.includes("stopL")
+    ) {
       setStatusMessage("Click on chart to place limit entry");
     } else if (trade.includes("takeP")) {
       setStatusMessage("Click on chart to place take profit level");
@@ -188,6 +138,237 @@ export const TradingChart: React.FC = () => {
       setStatusMessage("Click on chart to place stop loss level");
     }
   }, []);
+
+  // Handle chart clicks
+  const handleChartClick = useCallback(
+    (param: { point?: { x: number; y: number } }) => {
+      console.log("Chart clicked", param, "Active flow:", activeTradeFlow); // Debug
+
+      if (!param.point || !seriesRef.current) {
+        console.log("No point or series ref");
+        return;
+      }
+
+      // Convert the y-coordinate to price
+      const price = seriesRef.current.coordinateToPrice(param.point.y);
+      if (price === null) {
+        console.log("Could not convert to price");
+        return;
+      }
+
+      // Only process clicks if there's an active flow
+      if (!activeTradeFlow) {
+        console.log("No active flow");
+        return;
+      }
+
+      const flow = tradeFlows.find((f) => f.id === activeTradeFlow);
+      if (!flow) {
+        console.log("Flow not found");
+        return;
+      }
+
+      const step = activeTradeFlowStep;
+      const trade = flow.trades[step];
+      if (!trade) {
+        console.log("No trade at step", step);
+        return;
+      }
+
+      // Determine what kind of order this is
+      let orderType = "";
+      if (trade.includes("takeP")) {
+        orderType = "takeP";
+      } else if (trade.includes("stopL")) {
+        orderType = "stopL";
+      } else if (step === 0) {
+        orderType = "entry";
+      }
+
+      // Skip if we've already placed this order type
+      if (placedOrderTypes.has(orderType)) {
+        console.log(`Already placed ${orderType} order`);
+        return;
+      }
+
+      // Skip market entry placements - these should be placed automatically
+      if (step === 0 && trade.includes("mark")) {
+        console.log("Skipping market entry placement - should be automatic");
+        return;
+      }
+
+      console.log(`Placing ${orderType} order at price ${price}`);
+
+      // Determine color and title based on trade type
+      let color = "#4CAF50"; // Default green for entries
+      let title = "Limit Entry";
+
+      if (trade.includes("takeP")) {
+        color = "#2196F3"; // Blue for take profit
+        title = "Take Profit";
+      } else if (trade.includes("stopL")) {
+        color = "#FF9800"; // Orange for stop loss
+        title = "Stop Loss";
+      }
+
+      // Create price line config
+      const lineConfig = {
+        price: price,
+        color: color,
+        lineWidth: 2 as LineWidth,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: `${title}: ${price.toFixed(2)}`,
+      };
+
+      // Add price line to chart
+      const priceLine = seriesRef.current.createPriceLine(lineConfig);
+
+      // Add to context state
+      addTradeLevel({
+        type: trade,
+        active: true,
+        quantity: 1,
+        IpriceLine: priceLine,
+      });
+
+      // Mark this order type as placed
+      setPlacedOrderTypes((prev) => new Set([...prev, orderType]));
+
+      // Only handle auto-placements if this is the entry and we haven't placed the auto orders yet
+      if (step === 0) {
+        // Auto-place take profit if preset mode is enabled and not already placed
+        if (
+          flow.presetMode.takeP &&
+          flow.presets.takeP !== null &&
+          !placedOrderTypes.has("takeP")
+        ) {
+          const takeProfitTrade = flow.trades.find((t) => t.includes("takeP"));
+          if (takeProfitTrade) {
+            console.log("Auto-placing take profit after limit entry");
+
+            const direction: TradeDirection = "Buy"; // Will be dynamically determined later
+            const takeProfitPrice = calculatePresetPrice(
+              price,
+              direction,
+              "takeP",
+              flow.presets.takeP,
+            );
+
+            // Create take profit line config
+            const takeProfitLineConfig = {
+              price: takeProfitPrice,
+              color: "#2196F3", // Blue for take profit
+              lineWidth: 2 as LineWidth,
+              lineStyle: LineStyle.Solid,
+              axisLabelVisible: true,
+              title: `Take Profit (Auto): ${takeProfitPrice.toFixed(2)}`,
+            };
+
+            // Add price line to chart
+            const takeProfitPriceLine =
+              seriesRef.current.createPriceLine(takeProfitLineConfig);
+
+            // Add to context state
+            addTradeLevel({
+              type: takeProfitTrade,
+              active: true,
+              quantity: 1,
+              IpriceLine: takeProfitPriceLine,
+            });
+
+            // Mark as placed
+            setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
+          }
+        }
+
+        // Auto-place stop loss if preset mode is enabled and not already placed
+        if (
+          flow.presetMode.stopL &&
+          flow.presets.stopL !== null &&
+          !placedOrderTypes.has("stopL")
+        ) {
+          const stopLossTrade = flow.trades.find((t) => t.includes("stopL"));
+          if (stopLossTrade) {
+            console.log("Auto-placing stop loss after limit entry");
+
+            const direction: TradeDirection = "Buy"; // Will be dynamically determined later
+            const stopLossPrice = calculatePresetPrice(
+              price,
+              direction,
+              "stopL",
+              flow.presets.stopL,
+            );
+
+            // Create stop loss line config
+            const stopLossLineConfig = {
+              price: stopLossPrice,
+              color: "#FF9800", // Orange for stop loss
+              lineWidth: 2 as LineWidth,
+              lineStyle: LineStyle.Solid,
+              axisLabelVisible: true,
+              title: `Stop Loss (Auto): ${stopLossPrice.toFixed(2)}`,
+            };
+
+            // Add price line to chart
+            const stopLossPriceLine =
+              seriesRef.current.createPriceLine(stopLossLineConfig);
+
+            // Add to context state
+            addTradeLevel({
+              type: stopLossTrade,
+              active: true,
+              quantity: 1,
+              IpriceLine: stopLossPriceLine,
+            });
+
+            // Mark as placed
+            setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
+          }
+        }
+      }
+
+      // Calculate next step, skipping any preset-enabled steps
+      let nextStep = step + 1;
+      while (
+        nextStep < flow.trades.length &&
+        ((flow.trades[nextStep].includes("takeP") && flow.presetMode.takeP) ||
+          (flow.trades[nextStep].includes("stopL") && flow.presetMode.stopL))
+      ) {
+        nextStep++;
+      }
+
+      // Move to next step or deactivate flow
+      if (nextStep < flow.trades.length) {
+        setActiveTradeFlowStep(nextStep);
+        updateStatusMessage(flow, nextStep);
+      } else {
+        // Last step completed - exit macro mode
+        setActiveTradeFlowStep(0);
+        activateTradeFlow(""); // Deactivate trade flow
+        setStatusMessage("");
+      }
+    },
+    [
+      activeTradeFlow,
+      activeTradeFlowStep,
+      tradeFlows,
+      addTradeLevel,
+      setActiveTradeFlowStep,
+      activateTradeFlow,
+      updateStatusMessage,
+      calculatePresetPrice,
+      placedOrderTypes,
+    ],
+  );
+
+  // Initialize chart with our custom hook
+  const { chartRef, seriesRef, initChart, handleResize } = useTradingChart(
+    containerRef,
+    chartOptions,
+    candleSeriesOptions,
+    { onChartClick: handleChartClick },
+  );
 
   // Handle automatic market entry placement
   useEffect(() => {
@@ -199,12 +380,14 @@ export const TradingChart: React.FC = () => {
       // Update status message for current step
       updateStatusMessage(flow, activeTradeFlowStep);
 
-      // If this is a market entry (first step is "mark")
-      if (flow.trades[0].includes("mark")) {
+      // If this is a market entry (first step is "mark") and we haven't placed it yet
+      if (flow.trades[0].includes("mark") && !placedOrderTypes.has("entry")) {
         // Wait until we have a price
         if (lastPriceRef.current === null || !seriesRef.current) {
           return;
         }
+
+        console.log("Auto-placing market entry");
 
         // Create price line config
         const lineConfig = {
@@ -227,14 +410,119 @@ export const TradingChart: React.FC = () => {
           IpriceLine: priceLine,
         });
 
-        // Move to next step if there is one
-        if (flow.trades.length > 1) {
-          setActiveTradeFlowStep(1);
-          updateStatusMessage(flow, 1);
+        // Mark entry as placed to prevent duplicates
+        setPlacedOrderTypes((prev) => new Set([...prev, "entry"]));
+
+        // Auto-place take profit if preset mode is enabled and we haven't placed it yet
+        if (
+          flow.presetMode.takeP &&
+          flow.presets.takeP !== null &&
+          !placedOrderTypes.has("takeP")
+        ) {
+          const takeProfitTrade = flow.trades.find((t) => t.includes("takeP"));
+          if (takeProfitTrade) {
+            console.log("Auto-placing take profit");
+
+            // Assume Buy direction initially
+            const direction: TradeDirection = "Buy";
+            const takeProfitPrice = calculatePresetPrice(
+              lastPriceRef.current,
+              direction,
+              "takeP",
+              flow.presets.takeP,
+            );
+
+            // Create take profit line config
+            const takeProfitLineConfig = {
+              price: takeProfitPrice,
+              color: "#2196F3", // Blue for take profit
+              lineWidth: 2 as LineWidth,
+              lineStyle: LineStyle.Solid,
+              axisLabelVisible: true,
+              title: `Take Profit (Auto): ${takeProfitPrice.toFixed(2)}`,
+            };
+
+            // Add price line to chart
+            const takeProfitPriceLine =
+              seriesRef.current.createPriceLine(takeProfitLineConfig);
+
+            // Add to context state
+            addTradeLevel({
+              type: takeProfitTrade,
+              active: true,
+              quantity: 1,
+              IpriceLine: takeProfitPriceLine,
+            });
+
+            // Mark take profit as placed
+            setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
+          }
+        }
+
+        // Auto-place stop loss if preset mode is enabled and we haven't placed it yet
+        if (
+          flow.presetMode.stopL &&
+          flow.presets.stopL !== null &&
+          !placedOrderTypes.has("stopL")
+        ) {
+          const stopLossTrade = flow.trades.find((t) => t.includes("stopL"));
+          if (stopLossTrade) {
+            console.log("Auto-placing stop loss");
+
+            // Assume Buy direction initially
+            const direction: TradeDirection = "Buy";
+            const stopLossPrice = calculatePresetPrice(
+              lastPriceRef.current,
+              direction,
+              "stopL",
+              flow.presets.stopL,
+            );
+
+            // Create stop loss line config
+            const stopLossLineConfig = {
+              price: stopLossPrice,
+              color: "#FF9800", // Orange for stop loss
+              lineWidth: 2 as LineWidth,
+              lineStyle: LineStyle.Solid,
+              axisLabelVisible: true,
+              title: `Stop Loss (Auto): ${stopLossPrice.toFixed(2)}`,
+            };
+
+            // Add price line to chart
+            const stopLossPriceLine =
+              seriesRef.current.createPriceLine(stopLossLineConfig);
+
+            // Add to context state
+            addTradeLevel({
+              type: stopLossTrade,
+              active: true,
+              quantity: 1,
+              IpriceLine: stopLossPriceLine,
+            });
+
+            // Mark stop loss as placed
+            setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
+          }
+        }
+
+        // Calculate next step, skipping any preset-enabled steps
+        let nextStep = 1;
+        while (
+          nextStep < flow.trades.length &&
+          ((flow.trades[nextStep].includes("takeP") && flow.presetMode.takeP) ||
+            (flow.trades[nextStep].includes("stopL") && flow.presetMode.stopL))
+        ) {
+          nextStep++;
+        }
+
+        // Move to next step or complete if no more steps
+        if (nextStep < flow.trades.length) {
+          setActiveTradeFlowStep(nextStep);
+          updateStatusMessage(flow, nextStep);
         } else {
-          // Complete trade flow if no more steps
+          // All steps completed or automated
           setActiveTradeFlowStep(0);
-          setActiveTradeFlow(null);
+          activateTradeFlow(""); // Deactivate trade flow
           setStatusMessage("");
         }
       }
@@ -245,48 +533,37 @@ export const TradingChart: React.FC = () => {
     tradeFlows,
     addTradeLevel,
     setActiveTradeFlowStep,
-    setActiveTradeFlow,
+    activateTradeFlow,
     updateStatusMessage,
+    calculatePresetPrice,
+    placedOrderTypes,
   ]);
 
-  // Make chart responsive
+  // Initialize chart when component mounts
   useEffect(() => {
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [handleResize]);
+    console.log("Initializing chart...");
 
-  // Initialize chart only once when component mounts
-  useEffect(() => {
-    if (!hasInitializedChart.current) {
-      const { chart } = initChart() || {};
+    const result = initChart();
 
-      if (chart && containerRef.current) {
-        // Explicitly set chart size to container size
-        chart.applyOptions({
-          width: containerRef.current.clientWidth,
-          height: 400,
-        });
+    if (result?.chart && containerRef.current) {
+      // Explicitly set chart size to container size
+      result.chart.applyOptions({
+        width: containerRef.current.clientWidth,
+        height: 400,
+      });
 
-        // Detect when user manually positions the chart
-        chart.timeScale().subscribeVisibleTimeRangeChange(() => {
-          userPositionedChart.current = true;
-        });
-      }
+      // Force a resize after a short delay
+      setTimeout(() => {
+        handleResize();
+      }, 100);
 
-      hasInitializedChart.current = true;
-    }
-  }, [initChart]);
-
-  // Handle token changes - without reinitializing the chart
-  useEffect(() => {
-    // Reset data for new token
-    if (seriesRef.current) {
-      seriesRef.current.setData([]);
+      // Detect when user manually positions the chart
+      result.chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+        userPositionedChart.current = true;
+      });
     }
 
-    // Reset tracking variables
+    // Reset tracking variables for the new chart
     userPositionedChart.current = false;
     lastPriceRef.current = null;
     candleDataRef.current = {
@@ -294,7 +571,26 @@ export const TradingChart: React.FC = () => {
       currentCandle: null,
       candles: [],
     };
-  }, [selectedToken]);
+
+    // Clean up on unmount
+    return () => {
+      if (chartRef.current) {
+        try {
+          chartRef.current.unsubscribeClick(handleChartClick);
+        } catch (error) {
+          console.error("Error cleaning up chart:", error);
+        }
+      }
+    };
+  }, [selectedToken, initChart, handleResize, handleChartClick]);
+
+  // Handle resize
+  useEffect(() => {
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [handleResize]);
 
   // Extended exchange WebSocket connection
   const { lastMessage: extendedMessage, readyState: extendedReadyState } =
@@ -437,6 +733,11 @@ export const TradingChart: React.FC = () => {
       <div
         ref={containerRef}
         className="w-full border border-gray-700 rounded shadow-lg bg-gray-900 h-[400px]"
+        style={{
+          zIndex: 1,
+          position: "relative",
+          pointerEvents: "auto",
+        }}
       />
 
       <div className="w-full mt-2 text-xs text-gray-400 flex justify-between items-center">
