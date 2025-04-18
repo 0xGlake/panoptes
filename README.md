@@ -100,10 +100,22 @@ https://tradingview.github.io/lightweight-charts/tutorials
   - [ ] create a parser for tweets
 
 ## bugs
-- [ ] stopL/takeP lines are not showing up on chart
-- [ ] activating a macro just re-initialises the chart
-- [ ] mouse inputs do not work on the chart
-- [ ] editing a macro resets trading view (doesn't reset the chart)
-- [ ] the trade flow component isnt labelling properly for market orders
-- [ ] the trade flow component doesnt list the flow in the order the user creats the flow in (it defaults to take profit then stop loss)
-- [ ]
+- [ ] Bugs with the macro functionality in TradingChart.tsx
+  - [ ] when a macro is activated
+    // Get the active flow for guidance messages
+  const activeFlow = tradeFlows.find((f) => f.id === activeTradeFlow);
+  this snipped from TradingInterface.tsx displays the correct trading flow step but on the TradingChart.tsx it will say that there is no active flow
+  - [ ] stopL/takeP lines are not showing up on chart at all
+  - [ ] activating/deactivating a macro just re-initialises the chart
+  Creating new chart
+  TradingChart.tsx:192 Chart initialized with click handler
+  TradingChart.tsx:162 Creating new chart
+  TradingChart.tsx:192 Chart initialized with click handler
+  TradingChart.tsx:162 Creating new chart
+  TradingChart.tsx:192 Chart initialized with click handler
+  TradingChart.tsx:162 Creating new chart
+  TradingChart.tsx:192 Chart initialized with click handler
+  - [ ] mouse inputs do not work on the chart (most of the time)
+- [ ] Bugs with the trading flow factory components
+  - [ ] the trade flow component isnt labelling properly for market orders
+  - [ ] the trade flow component doesnt list the flow in the order the user creats the flow in (it defaults to take profit then stop loss)

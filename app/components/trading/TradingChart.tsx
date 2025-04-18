@@ -51,13 +51,17 @@ export const TradingChart: React.FC = () => {
   // Track if user has manually positioned the chart
   const userPositionedChart = useRef(false);
   const lastPriceRef = useRef<number | null>(null);
+  const chartInitialized = useRef(false);
 
   // Container ref for chart
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Chart and series refs
-  const chartRef = useRef<IChartApi>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick">>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+
+  // Keep track of active flow in ref to avoid reinitializations
+  const activeTradeFlowRef = useRef<string | null>(null);
 
   // Tracking refs for candle data
   const candleDataRef = useRef<{
@@ -69,14 +73,6 @@ export const TradingChart: React.FC = () => {
     currentCandle: null,
     candles: [],
   });
-
-  // Reset order tracking when a new flow is activated
-  useEffect(() => {
-    if (activeTradeFlow) {
-      setPlacedOrderTypes(new Set());
-      console.log("New trade flow activated, resetting placed order types");
-    }
-  }, [activeTradeFlow]);
 
   // Chart options - memoized to prevent unnecessary rerenders
   const chartOptions = useMemo(
@@ -125,6 +121,23 @@ export const TradingChart: React.FC = () => {
     [],
   );
 
+  // Update the activeTradeFlowRef when activeTradeFlow changes
+  useEffect(() => {
+    console.log(`Active flow updated: ${activeTradeFlow}`);
+    activeTradeFlowRef.current = activeTradeFlow;
+
+    // Reset placed orders when flow changes
+    if (activeTradeFlow) {
+      setPlacedOrderTypes(new Set());
+
+      // Update status message for the new flow
+      const flow = tradeFlows.find((f) => f.id === activeTradeFlow);
+      if (flow) {
+        updateStatusMessage(flow, activeTradeFlowStep);
+      }
+    }
+  }, [activeTradeFlow, activeTradeFlowStep, tradeFlows]);
+
   // Function to update status message based on current flow and step
   const updateStatusMessage = useCallback((flow: TradeFlow, step: number) => {
     if (!flow || step >= flow.trades.length) {
@@ -149,7 +162,7 @@ export const TradingChart: React.FC = () => {
     }
   }, []);
 
-  // Initialize chart
+  // Initialize chart - but do not re-run this when active flow changes
   const initializeChart = useCallback(() => {
     if (!containerRef.current) {
       console.log("Container ref not available");
@@ -159,6 +172,8 @@ export const TradingChart: React.FC = () => {
     // Clean up previous chart if it exists
     if (chartRef.current) {
       try {
+        // Make sure to unsubscribe click handler before removing
+        chartRef.current.unsubscribeClick(handleChartClick);
         chartRef.current.remove();
       } catch (error) {
         console.error("Error removing chart:", error);
@@ -194,13 +209,19 @@ export const TradingChart: React.FC = () => {
         userPositionedChart.current = true;
       });
 
-      // Subscribe to click events
-      chart.subscribeClick(handleChartClick);
+      // Wait for the next tick before attaching click handler
+      setTimeout(() => {
+        if (chartRef.current) {
+          chartRef.current.subscribeClick(handleChartClick);
+          console.log("Chart initialized with click handler");
+        }
+      }, 0);
 
-      console.log("Chart initialized with click handler");
+      chartInitialized.current = true;
     } catch (error) {
       console.error("Error creating chart:", error);
     }
+    // Deliberately omitting handleChartClick from dependencies to prevent re-initialization
   }, [chartOptions, candleSeriesOptions]);
 
   // Handle chart clicks
@@ -220,15 +241,17 @@ export const TradingChart: React.FC = () => {
         return;
       }
 
-      console.log("Click at price:", price, "Active flow:", activeTradeFlow);
+      // Since we're using activeTradeFlowRef, we should have the latest value
+      const currentActiveFlow = activeTradeFlowRef.current;
+      console.log("Click at price:", price, "Active flow:", currentActiveFlow);
 
       // Only process clicks if there's an active flow
-      if (!activeTradeFlow) {
+      if (!currentActiveFlow) {
         console.log("No active flow");
         return;
       }
 
-      const flow = tradeFlows.find((f) => f.id === activeTradeFlow);
+      const flow = tradeFlows.find((f) => f.id === currentActiveFlow);
       if (!flow) {
         console.log("Flow not found");
         return;
@@ -293,18 +316,23 @@ export const TradingChart: React.FC = () => {
       }
 
       // Add price line to chart
-      const priceLine = seriesRef.current.createPriceLine(lineConfig);
+      try {
+        const priceLine = seriesRef.current.createPriceLine(lineConfig);
 
-      // Add to context state
-      addTradeLevel({
-        type: trade,
-        active: true,
-        quantity: 1,
-        IpriceLine: priceLine,
-      });
+        // Add to context state
+        addTradeLevel({
+          type: trade,
+          active: true,
+          quantity: 1,
+          IpriceLine: priceLine,
+        });
 
-      // Mark this order type as placed
-      setPlacedOrderTypes((prev) => new Set([...prev, orderType]));
+        // Mark this order type as placed
+        setPlacedOrderTypes((prev) => new Set([...prev, orderType]));
+      } catch (error) {
+        console.error("Error creating price line:", error);
+        return;
+      }
 
       // Only handle auto-placements if this is the entry and we haven't placed the auto orders yet
       if (step === 0) {
@@ -315,7 +343,7 @@ export const TradingChart: React.FC = () => {
           !placedOrderTypes.has("takeP")
         ) {
           const takeProfitTrade = flow.trades.find((t) => t.includes("takeP"));
-          if (takeProfitTrade) {
+          if (takeProfitTrade && seriesRef.current) {
             console.log("Auto-placing take profit after limit entry");
 
             const direction: TradeDirection = "Buy"; // Will be dynamically determined later
@@ -336,20 +364,24 @@ export const TradingChart: React.FC = () => {
               title: `Take Profit (Auto): ${takeProfitPrice.toFixed(2)}`,
             };
 
-            // Add price line to chart
-            const takeProfitPriceLine =
-              seriesRef.current.createPriceLine(takeProfitLineConfig);
+            try {
+              // Add price line to chart
+              const takeProfitPriceLine =
+                seriesRef.current.createPriceLine(takeProfitLineConfig);
 
-            // Add to context state
-            addTradeLevel({
-              type: takeProfitTrade,
-              active: true,
-              quantity: 1,
-              IpriceLine: takeProfitPriceLine,
-            });
+              // Add to context state
+              addTradeLevel({
+                type: takeProfitTrade,
+                active: true,
+                quantity: 1,
+                IpriceLine: takeProfitPriceLine,
+              });
 
-            // Mark as placed
-            setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
+              // Mark as placed
+              setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
+            } catch (error) {
+              console.error("Error creating take profit line:", error);
+            }
           }
         }
 
@@ -360,7 +392,7 @@ export const TradingChart: React.FC = () => {
           !placedOrderTypes.has("stopL")
         ) {
           const stopLossTrade = flow.trades.find((t) => t.includes("stopL"));
-          if (stopLossTrade) {
+          if (stopLossTrade && seriesRef.current) {
             console.log("Auto-placing stop loss after limit entry");
 
             const direction: TradeDirection = "Buy"; // Will be dynamically determined later
@@ -381,20 +413,24 @@ export const TradingChart: React.FC = () => {
               title: `Stop Loss (Auto): ${stopLossPrice.toFixed(2)}`,
             };
 
-            // Add price line to chart
-            const stopLossPriceLine =
-              seriesRef.current.createPriceLine(stopLossLineConfig);
+            try {
+              // Add price line to chart
+              const stopLossPriceLine =
+                seriesRef.current.createPriceLine(stopLossLineConfig);
 
-            // Add to context state
-            addTradeLevel({
-              type: stopLossTrade,
-              active: true,
-              quantity: 1,
-              IpriceLine: stopLossPriceLine,
-            });
+              // Add to context state
+              addTradeLevel({
+                type: stopLossTrade,
+                active: true,
+                quantity: 1,
+                IpriceLine: stopLossPriceLine,
+              });
 
-            // Mark as placed
-            setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
+              // Mark as placed
+              setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
+            } catch (error) {
+              console.error("Error creating stop loss line:", error);
+            }
           }
         }
       }
@@ -421,9 +457,8 @@ export const TradingChart: React.FC = () => {
       }
     },
     [
-      activeTradeFlow,
-      activeTradeFlowStep,
       tradeFlows,
+      activeTradeFlowStep,
       addTradeLevel,
       setActiveTradeFlowStep,
       activateTradeFlow,
@@ -436,9 +471,10 @@ export const TradingChart: React.FC = () => {
   // Handle automatic market entry placement
   const handleMarketEntryPlacement = useCallback(() => {
     // Only run when a trade flow is activated and we're at step 0
-    if (!activeTradeFlow || activeTradeFlowStep !== 0) return;
+    const currentActiveFlow = activeTradeFlowRef.current;
+    if (!currentActiveFlow || activeTradeFlowStep !== 0) return;
 
-    const flow = tradeFlows.find((f) => f.id === activeTradeFlow);
+    const flow = tradeFlows.find((f) => f.id === currentActiveFlow);
     if (!flow) return;
 
     // Update status message for current step
@@ -463,19 +499,24 @@ export const TradingChart: React.FC = () => {
       title: `Market Entry: ${lastPriceRef.current.toFixed(2)}`,
     };
 
-    // Add price line to chart
-    const priceLine = seriesRef.current.createPriceLine(lineConfig);
+    try {
+      // Add price line to chart
+      const priceLine = seriesRef.current.createPriceLine(lineConfig);
 
-    // Add to context state
-    addTradeLevel({
-      type: flow.trades[0],
-      active: true,
-      quantity: 1,
-      IpriceLine: priceLine,
-    });
+      // Add to context state
+      addTradeLevel({
+        type: flow.trades[0],
+        active: true,
+        quantity: 1,
+        IpriceLine: priceLine,
+      });
 
-    // Mark entry as placed to prevent duplicates
-    setPlacedOrderTypes((prev) => new Set([...prev, "entry"]));
+      // Mark entry as placed to prevent duplicates
+      setPlacedOrderTypes((prev) => new Set([...prev, "entry"]));
+    } catch (error) {
+      console.error("Error creating entry price line:", error);
+      return;
+    }
 
     // Auto-place take profit if preset mode is enabled and we haven't placed it yet
     if (
@@ -484,7 +525,7 @@ export const TradingChart: React.FC = () => {
       !placedOrderTypes.has("takeP")
     ) {
       const takeProfitTrade = flow.trades.find((t) => t.includes("takeP"));
-      if (takeProfitTrade) {
+      if (takeProfitTrade && seriesRef.current) {
         console.log("Auto-placing take profit for market entry");
 
         // Assume Buy direction initially
@@ -506,20 +547,24 @@ export const TradingChart: React.FC = () => {
           title: `Take Profit (Auto): ${takeProfitPrice.toFixed(2)}`,
         };
 
-        // Add price line to chart
-        const takeProfitPriceLine =
-          seriesRef.current.createPriceLine(takeProfitLineConfig);
+        try {
+          // Add price line to chart
+          const takeProfitPriceLine =
+            seriesRef.current.createPriceLine(takeProfitLineConfig);
 
-        // Add to context state
-        addTradeLevel({
-          type: takeProfitTrade,
-          active: true,
-          quantity: 1,
-          IpriceLine: takeProfitPriceLine,
-        });
+          // Add to context state
+          addTradeLevel({
+            type: takeProfitTrade,
+            active: true,
+            quantity: 1,
+            IpriceLine: takeProfitPriceLine,
+          });
 
-        // Mark take profit as placed
-        setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
+          // Mark take profit as placed
+          setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
+        } catch (error) {
+          console.error("Error creating take profit line:", error);
+        }
       }
     }
 
@@ -530,7 +575,7 @@ export const TradingChart: React.FC = () => {
       !placedOrderTypes.has("stopL")
     ) {
       const stopLossTrade = flow.trades.find((t) => t.includes("stopL"));
-      if (stopLossTrade) {
+      if (stopLossTrade && seriesRef.current) {
         console.log("Auto-placing stop loss for market entry");
 
         // Assume Buy direction initially
@@ -552,20 +597,24 @@ export const TradingChart: React.FC = () => {
           title: `Stop Loss (Auto): ${stopLossPrice.toFixed(2)}`,
         };
 
-        // Add price line to chart
-        const stopLossPriceLine =
-          seriesRef.current.createPriceLine(stopLossLineConfig);
+        try {
+          // Add price line to chart
+          const stopLossPriceLine =
+            seriesRef.current.createPriceLine(stopLossLineConfig);
 
-        // Add to context state
-        addTradeLevel({
-          type: stopLossTrade,
-          active: true,
-          quantity: 1,
-          IpriceLine: stopLossPriceLine,
-        });
+          // Add to context state
+          addTradeLevel({
+            type: stopLossTrade,
+            active: true,
+            quantity: 1,
+            IpriceLine: stopLossPriceLine,
+          });
 
-        // Mark stop loss as placed
-        setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
+          // Mark stop loss as placed
+          setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
+        } catch (error) {
+          console.error("Error creating stop loss line:", error);
+        }
       }
     }
 
@@ -590,9 +639,8 @@ export const TradingChart: React.FC = () => {
       setStatusMessage("");
     }
   }, [
-    activeTradeFlow,
-    activeTradeFlowStep,
     tradeFlows,
+    activeTradeFlowStep,
     addTradeLevel,
     setActiveTradeFlowStep,
     activateTradeFlow,
@@ -615,12 +663,16 @@ export const TradingChart: React.FC = () => {
     }
   }, []);
 
-  // Initialize chart on component mount
+  // Initialize chart on component mount - only once
   useEffect(() => {
-    initializeChart();
+    if (!chartInitialized.current) {
+      initializeChart();
 
-    // Setup resize handler
-    window.addEventListener("resize", handleResize);
+      // Setup resize handler
+      window.addEventListener("resize", handleResize);
+
+      chartInitialized.current = true;
+    }
 
     // Cleanup on unmount
     return () => {
@@ -634,10 +686,14 @@ export const TradingChart: React.FC = () => {
         }
       }
     };
-  }, [initializeChart, handleResize, handleChartClick]);
+  }, []);
 
-  // Re-initialize chart when token changes
+  // Re-initialize chart ONLY when token changes
   useEffect(() => {
+    // Skip the first render
+    if (!chartInitialized.current) return;
+
+    console.log("Token changed, reinitializing chart");
     initializeChart();
 
     // Reset tracking variables
@@ -648,19 +704,15 @@ export const TradingChart: React.FC = () => {
       currentCandle: null,
       candles: [],
     };
-  }, [selectedToken, initializeChart]);
+  }, [selectedToken]);
 
   // Trigger market entry placement when needed
   useEffect(() => {
-    handleMarketEntryPlacement();
+    // Only run if chart is initialized and there's an active flow
+    if (chartInitialized.current && activeTradeFlow) {
+      handleMarketEntryPlacement();
+    }
   }, [handleMarketEntryPlacement, activeTradeFlow, activeTradeFlowStep]);
-
-  // Monitor trade levels and reflect changes on the chart
-  useEffect(() => {
-    // We don't need to do anything here anymore - the context should handle removal of price lines
-    // This effect exists just to document that we're aware of this interaction
-    console.log("Trade levels updated:", tradeLevels.length);
-  }, [tradeLevels]);
 
   // Extended exchange WebSocket connection
   const { lastMessage: extendedMessage, readyState: extendedReadyState } =
@@ -696,9 +748,9 @@ export const TradingChart: React.FC = () => {
         // Convert to minutes for candle grouping
         const currentMinute = Math.floor(timestamp / (60 * 1000));
 
-        // Create UTC timestamp for lightweight-charts (seconds) THIS CALCULATION IS COMPLETELY INCORRECT
-        const utcTimestamp = (Math.floor(currentMinute * 60) *
-          1000) as UTCTimestamp;
+        // Create UTC timestamp for lightweight-charts (seconds)
+        // Fix the incorrect calculation - lightweight-charts UTCTimestamp is in seconds
+        const utcTimestamp = Math.floor(timestamp / 1000) as UTCTimestamp;
 
         // Check if this is a new minute
         if (currentMinute !== candleDataRef.current.currentMinute) {
@@ -805,10 +857,11 @@ export const TradingChart: React.FC = () => {
         ref={containerRef}
         className="w-full border border-gray-700 rounded shadow-lg bg-gray-900 h-[400px]"
         style={{
-          zIndex: 1,
+          zIndex: 10, // Increased z-index to ensure chart is on top
           position: "relative",
-          pointerEvents: "auto",
+          cursor: activeTradeFlow ? "crosshair" : "default",
         }}
+        data-testid="chart-container" // Add a test ID for debugging
       />
 
       <div className="w-full mt-2 text-xs text-gray-400 flex justify-between items-center">
