@@ -24,29 +24,20 @@ export const useTradingChart = (
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
-  // Initialize chart
+  // Initialize chart - use a stable callback that won't change on every render
   const initChart = useCallback(() => {
     if (!containerRef.current) {
-      console.log("Container ref not available");
-      return;
+      console.error("Container ref not available");
+      return null;
     }
 
-    // Clean up previous chart if it exists
-    if (chartRef.current) {
-      try {
-        // Make sure to unsubscribe the click handler before removing
-        if (onChartClick) {
-          chartRef.current.unsubscribeClick(onChartClick);
-        }
-        chartRef.current.remove();
-      } catch (error) {
-        console.error("Error removing old chart:", error);
-      }
-      chartRef.current = null;
-      seriesRef.current = null;
+    // If chart already exists, don't recreate it
+    if (chartRef.current && seriesRef.current) {
+      console.log("Chart already initialized, skipping recreation");
+      return { chart: chartRef.current, candleSeries: seriesRef.current };
     }
 
-    console.log("Creating new chart...");
+    console.log("Creating new chart instance");
 
     try {
       // Create new chart
@@ -66,14 +57,6 @@ export const useTradingChart = (
       if (onChartClick) {
         console.log("Subscribing to chart click events");
         chart.subscribeClick(onChartClick);
-
-        // Log a test click to verify the handler is working
-        console.log("Chart click handler attached, testing...");
-        setTimeout(() => {
-          const testClick = { point: { x: 100, y: 100 } };
-          console.log("Simulating click:", testClick);
-          // This is just to log, not actually trigger the click
-        }, 500);
       }
 
       // Start with empty candles
@@ -90,14 +73,13 @@ export const useTradingChart = (
       console.error("Error creating chart:", error);
       return null;
     }
-  }, [containerRef, chartOptions, seriesOptions, onChartClick]);
+  }, []); // Empty dependency array to make this callback stable
 
   // Handle resize
   const handleResize = useCallback(() => {
     if (containerRef.current && chartRef.current) {
       try {
         const newWidth = containerRef.current.clientWidth;
-        console.log("Resizing chart to width:", newWidth);
         chartRef.current.applyOptions({
           width: newWidth,
         });
@@ -112,7 +94,7 @@ export const useTradingChart = (
         console.error("Error resizing chart:", error);
       }
     }
-  }, [containerRef]);
+  }, []);
 
   return {
     chartRef,

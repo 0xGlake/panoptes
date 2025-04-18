@@ -1,16 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, memo } from "react";
 import { useTradingContext } from "../../context/TradingContext";
 import { TradeFlowItem } from "./TradeFlowItem";
 
-export const TradeFlowFactory: React.FC = () => {
+// Memoize the component to prevent unnecessary re-renders
+export const TradeFlowFactory: React.FC = memo(() => {
   const { tradeFlows, createTradeFlow } = useTradingContext();
   const [showAddMacroDropdown, setShowAddMacroDropdown] = useState(false);
 
   // Handle creating new trade flow
-  const handleCreateTradeFlow = (tradeType: "mark" | "limit") => {
-    createTradeFlow(tradeType);
-    setShowAddMacroDropdown(false);
-  };
+  const handleCreateTradeFlow = useCallback(
+    (tradeType: "mark" | "limit") => {
+      createTradeFlow(tradeType);
+      setShowAddMacroDropdown(false);
+    },
+    [createTradeFlow],
+  );
+
+  const toggleDropdown = useCallback(() => {
+    setShowAddMacroDropdown((prev) => !prev);
+  }, []);
 
   return (
     <div className="w-full mt-4 border-t border-gray-700 pt-4">
@@ -20,7 +28,7 @@ export const TradeFlowFactory: React.FC = () => {
         <div className="relative">
           <button
             className="px-2 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-500"
-            onClick={() => setShowAddMacroDropdown((prev) => !prev)}
+            onClick={toggleDropdown}
           >
             Add Macro
           </button>
@@ -46,7 +54,7 @@ export const TradeFlowFactory: React.FC = () => {
 
       {tradeFlows.length === 0 ? (
         <div className="text-center py-4 text-gray-500">
-          No trade flows created yet. Click &quotAdd Macro&quot, to create one.
+          No trade flows created yet. Click Add Macro to create one.
         </div>
       ) : (
         <div className="space-y-4">
@@ -57,4 +65,7 @@ export const TradeFlowFactory: React.FC = () => {
       )}
     </div>
   );
-};
+});
+
+// Set display name for debugging
+TradeFlowFactory.displayName = "TradeFlowFactory";

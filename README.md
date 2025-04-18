@@ -98,3 +98,12 @@ https://tradingview.github.io/lightweight-charts/tutorials
 - [ ] Twitter aggregator
   - [ ] create a collection of high value accounts
   - [ ] create a parser for tweets
+
+## bugs
+- [ ] stopL/takeP lines are not showing up on chart
+- [ ] activating a macro just re-initialises the chart
+- [ ] mouse inputs do not work on the chart
+- [ ] editing a macro resets trading view (doesn't reset the chart)
+- [ ] the trade flow component isnt labelling properly for market orders
+- [ ] the trade flow component doesnt list the flow in the order the user creats the flow in (it defaults to take profit then stop loss)
+- [ ]
