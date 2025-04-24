@@ -21,7 +21,6 @@ export const TradingChart: React.FC = () => {
     selectedToken,
     setSelectedToken,
     tradeLevels,
-    setLastPrice,
     activeTradeFlow,
     activeTradeFlowStep,
     tradeFlows,
@@ -539,9 +538,6 @@ export const TradingChart: React.FC = () => {
           lastPriceRef.current = askPrice;
         }
 
-        // Update context
-        setLastPrice(askPrice);
-
         // Process for candle
         const minute = Math.floor(timestamp / (60 * 1000));
         const utcTimestamp = Math.floor(timestamp / 1000) as UTCTimestamp;
@@ -592,7 +588,7 @@ export const TradingChart: React.FC = () => {
     } catch (error) {
       console.error("Error processing message:", error);
     }
-  }, [lastMessage, setLastPrice]);
+  }, [lastMessage]);
 
   return (
     <>
