@@ -100,18 +100,6 @@ https://tradingview.github.io/lightweight-charts/tutorials
   - [ ] create a parser for tweets
 
 ## bugs
-- [ ] Bugs with the macro functionality in TradingChart.tsx
-  - [ ] When trade levels are deleted by other components it is not reflected on the trading chart (probably because we are manually adding the lines instead of using useTradingContext() tradeLevels variable)
-  - [ ] clicks are doubling up on console logs which might mean it is subscribing to the chart twice
-
-  This is the console log when a trading flow is activated and it is prompting me to place an order on the chart, the first log recognises theres a flow and the second doesnt? so no takeP/stopL orders are ever actually placed. This is probably the primary reason that not takeP/stopL orders are ever placed
-
-  Chart clicked: {time: 1744984680, logical: 2, point: {…}, hoveredSeries: undefined, hoveredObjectId: undefined, …}
-  TradingChart.tsx:246 Click at price: 37376.42606013877 Active flow: flow-1744984283549
-  TradingChart.tsx:256 Flow not found
-
-
-  - [ ] When the asset is changed it still uses the last price to set the first price of the new chart, this is incorrect because say I go from BTC to ETH the candle will start multiples off of what the true ETH price is and it causes the first candle to wick
 - [ ] Bugs with the trading flow factory components
   - [ ] the trade flow component isnt labelling properly for market orders
   - [ ] the trade flow component doesnt list the flow in the order the user creats the flow in (it defaults to take profit then stop loss)
