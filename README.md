@@ -103,3 +103,7 @@ https://tradingview.github.io/lightweight-charts/tutorials
 - [ ] Bugs with the trading flow factory components
   - [ ] the trade flow component isnt labelling properly for market orders
   - [ ] the trade flow component doesnt list the flow in the order the user creats the flow in (it defaults to take profit then stop loss)
+
+## todo
+- [ ] ability to move takeP/stopL levels via click and drag
+- [ ] display pumpfun charts via web sockets

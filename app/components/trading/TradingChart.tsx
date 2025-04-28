@@ -61,6 +61,8 @@ export const TradingChart: React.FC = () => {
 
   // ===== CHART CREATION & CLEANUP =====
   const createTradingChart = useCallback(() => {
+    console.log("Creating chart, isInitialized:", isInitialized);
+
     if (!containerRef.current) return;
 
     // Clean up previous chart
@@ -107,12 +109,27 @@ export const TradingChart: React.FC = () => {
     chartRef.current = chart;
     seriesRef.current = candleSeries;
 
-    // After creation, subscribe to click events
-    setTimeout(() => {
-      if (chartRef.current) {
-        chartRef.current.subscribeClick(handleChartClick);
+    // After creation, set up chart and subscriptions once it's fully ready
+    let isClickHandlerAttached = false;
+
+    const setupChartAndSubscriptions = () => {
+      if (chartRef.current && seriesRef.current && !isClickHandlerAttached) {
+        try {
+          // Wait until both chart and series refs are available
+          chartRef.current.subscribeClick(handleChartClick);
+          isClickHandlerAttached = true;
+          console.log("Successfully subscribed to click events");
+        } catch (error) {
+          console.error("Error subscribing to chart click events:", error);
+        }
+      } else if (!isClickHandlerAttached) {
+        // Try again if not yet subscribed
+        setTimeout(setupChartAndSubscriptions, 50);
       }
-    }, 0);
+    };
+
+    // Start setup with initial delay
+    setTimeout(setupChartAndSubscriptions, 100);
   }, []);
 
   // Setup chart resize handling
@@ -126,6 +143,8 @@ export const TradingChart: React.FC = () => {
 
   // ===== INITIALIZATION & CLEANUP =====
   useEffect(() => {
+    console.log("Initial setup effect running");
+
     // Initial setup
     createTradingChart();
     window.addEventListener("resize", handleResize);
@@ -173,7 +192,7 @@ export const TradingChart: React.FC = () => {
     try {
       // Create a set of currently active trade level IDs
       const activeTradeIds = new Set<string>();
-      tradeLevels.forEach(level => {
+      tradeLevels.forEach((level) => {
         if (level.active) {
           activeTradeIds.add(level.id);
         }
@@ -193,13 +212,17 @@ export const TradingChart: React.FC = () => {
       });
 
       // Clean up our reference map
-      removedIds.forEach(id => {
+      removedIds.forEach((id) => {
         priceLinesRef.current.delete(id);
       });
 
       // Add any new trade levels' price lines to our tracking map
-      tradeLevels.forEach(level => {
-        if (level.active && level.IpriceLine && !priceLinesRef.current.has(level.id)) {
+      tradeLevels.forEach((level) => {
+        if (
+          level.active &&
+          level.IpriceLine &&
+          !priceLinesRef.current.has(level.id)
+        ) {
           priceLinesRef.current.set(level.id, level.IpriceLine);
         }
       });
@@ -378,14 +401,22 @@ export const TradingChart: React.FC = () => {
   // ===== HANDLE CHART CLICKS =====
   const handleChartClick = useCallback(
     (param: { point?: { x: number; y: number } }) => {
+      console.log(param);
+      console.log(activeTradeFlow);
       if (!param.point || !seriesRef.current || !activeTradeFlow) return;
 
       // Convert y-coordinate to price
-      const price = seriesRef.current.coordinateToPrice(param.point.y);
+      const price = seriesRef.current.coordinateToPrice(
+        param.point.y,
+      ) as number;
       if (price === null) return;
+
+      console.log(price);
 
       const flow = tradeFlows.find((f) => f.id === activeTradeFlow);
       if (!flow) return;
+
+      console.log(flow);
 
       const trade = flow.trades[activeTradeFlowStep];
       if (!trade) return;
@@ -438,6 +469,7 @@ export const TradingChart: React.FC = () => {
         setPlacedOrderTypes((prev) => new Set([...prev, orderType]));
 
         // Handle auto-placements for entry step
+        // TODO: This logic can be simplified, lots of repeated code
         if (activeTradeFlowStep === 0) {
           // Auto-place take profit if preset enabled
           if (
@@ -687,3 +719,4 @@ export const TradingChart: React.FC = () => {
       </div>
     </>
   );
+};
