@@ -21,10 +21,10 @@ export const TradingChart: React.FC = () => {
     selectedToken,
     setSelectedToken,
     tradeLevels,
+    addTradeLevel,
     activeTradeFlow,
     activeTradeFlowStep,
     tradeFlows,
-    addTradeLevel,
     setActiveTradeFlowStep,
     activateTradeFlow,
     calculatePresetPrice,
@@ -152,9 +152,61 @@ export const TradingChart: React.FC = () => {
     currentMinute.current = -1;
     userPositionedChart.current = false;
 
+    // Clear price line tracking
+    if (priceLinesRef.current) {
+      priceLinesRef.current.clear();
+    }
+
     // Recreate chart
     createTradingChart();
   }, [selectedToken, isInitialized, createTradingChart]);
+
+  // ===== SYNC tradeLevels with chart =====
+  // Track price lines that we've created in a ref
+  const priceLinesRef = useRef<Map<string, any>>(new Map());
+
+  useEffect(() => {
+    if (!seriesRef.current) return;
+
+    console.log("Syncing trade levels with chart");
+
+    try {
+      // Create a set of currently active trade level IDs
+      const activeTradeIds = new Set<string>();
+      tradeLevels.forEach(level => {
+        if (level.active) {
+          activeTradeIds.add(level.id);
+        }
+      });
+
+      // Remove price lines for trade levels that are no longer active
+      const removedIds: string[] = [];
+      priceLinesRef.current.forEach((priceLine, id) => {
+        if (!activeTradeIds.has(id)) {
+          try {
+            seriesRef.current?.removePriceLine(priceLine);
+            removedIds.push(id);
+          } catch (error) {
+            console.error("Error removing price line:", error);
+          }
+        }
+      });
+
+      // Clean up our reference map
+      removedIds.forEach(id => {
+        priceLinesRef.current.delete(id);
+      });
+
+      // Add any new trade levels' price lines to our tracking map
+      tradeLevels.forEach(level => {
+        if (level.active && level.IpriceLine && !priceLinesRef.current.has(level.id)) {
+          priceLinesRef.current.set(level.id, level.IpriceLine);
+        }
+      });
+    } catch (error) {
+      console.error("Error syncing trade levels:", error);
+    }
+  }, [tradeLevels]); // Add tradeLevels as dependency to respond to context changes
 
   // ===== TRADE FLOW HANDLING =====
   // Reset placed orders when flow changes
@@ -322,32 +374,6 @@ export const TradingChart: React.FC = () => {
     activateTradeFlow,
     calculatePresetPrice,
   ]);
-
-  // ===== SYNC tradeLevels with chart =====
-  useEffect(() => {
-    if (!seriesRef.current) return;
-
-    try {
-      // Build map of active levels
-      const activeLevelMap = new Map();
-      tradeLevels.forEach((level) => {
-        if (level.active && level.IpriceLine) {
-          activeLevelMap.set(level.IpriceLine, true);
-        }
-      });
-
-      // Check each price line on the chart
-      const priceLinesInfo = seriesRef.current.seriesInfo().priceLines;
-      priceLinesInfo.forEach((info) => {
-        const priceLine = info.priceLine;
-        if (!activeLevelMap.has(priceLine)) {
-          seriesRef.current?.removePriceLine(priceLine);
-        }
-      });
-    } catch (error) {
-      console.error("Error syncing trade levels:", error);
-    }
-  }, [tradeLevels]);
 
   // ===== HANDLE CHART CLICKS =====
   const handleChartClick = useCallback(
@@ -661,4 +687,3 @@ export const TradingChart: React.FC = () => {
       </div>
     </>
   );
-};

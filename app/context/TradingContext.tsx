@@ -1,11 +1,5 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useRef,
-} from "react";
-import { ISeriesApi } from "lightweight-charts";
+// /context/TradingContext.tsx
+import React, { createContext, useContext, useState, useCallback } from "react";
 import {
   TradeType,
   TradePlacement,
@@ -25,7 +19,6 @@ interface TradingContextType {
   tradeFlows: TradeFlow[];
   activeTradeFlow: string | null;
   activeTradeFlowStep: number;
-  lastPrice: number | null;
 
   // Functions
   setSelectedToken: (token: ArbitrageToken) => void;
@@ -49,7 +42,6 @@ interface TradingContextType {
   updateMacroShortcut: (flowId: string, shortcut: string) => void;
   activateTradeFlow: (flowId: string) => void;
   setActiveTradeFlowStep: (step: number) => void;
-  setLastPrice: (price: number) => void;
   calculatePresetPrice: (
     entryPrice: number,
     direction: TradeDirection,
@@ -66,7 +58,6 @@ export const TradingContext = createContext<TradingContextType>({
   tradeFlows: [],
   activeTradeFlow: null,
   activeTradeFlowStep: 0,
-  lastPrice: null,
 
   setSelectedToken: () => {},
   setMacroActive: () => {},
@@ -82,7 +73,6 @@ export const TradingContext = createContext<TradingContextType>({
   updateMacroShortcut: () => {},
   activateTradeFlow: () => {},
   setActiveTradeFlowStep: () => {},
-  setLastPrice: () => {},
   calculatePresetPrice: () => 0,
 });
 
@@ -103,45 +93,22 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
   const [tradeFlows, setTradeFlows] = useState<TradeFlow[]>([]);
   const [activeTradeFlow, setActiveTradeFlow] = useState<string | null>(null);
   const [activeTradeFlowStep, setActiveTradeFlowStep] = useState<number>(0);
-  const [lastPrice, setLastPrice] = useState<number | null>(null);
 
-  // References to chart objects
-  const chartSeriesRef = useRef<ISeriesApi<"Candlestick">>(null);
-
-  // Add a trade level
+  // Add a trade level - no chart manipulation, just state update
   const addTradeLevel = useCallback((level: Omit<TradeLevel, "id">) => {
     const id = `level-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     setTradeLevels((prev) => [...prev, { ...level, id }]);
   }, []);
 
-  // Remove a trade level
+  // Remove a trade level - no chart manipulation, just state update
   const removeTradeLevel = useCallback((id: string) => {
-    setTradeLevels((prev) => {
-      const level = prev.find((l) => l.id === id);
-      if (level && chartSeriesRef.current) {
-        try {
-          chartSeriesRef.current.removePriceLine(level.IpriceLine);
-        } catch (error) {
-          console.error("Error removing price line:", error);
-        }
-      }
-      return prev.filter((l) => l.id !== id);
-    });
+    setTradeLevels((prev) => prev.filter((l) => l.id !== id));
   }, []);
 
-  // Clear all trade levels
+  // Clear all trade levels - no chart manipulation, just state update
   const clearAllTradeLevels = useCallback(() => {
-    if (chartSeriesRef.current) {
-      tradeLevels.forEach((level) => {
-        try {
-          chartSeriesRef.current?.removePriceLine(level.IpriceLine);
-        } catch (error) {
-          console.error("Error removing price line:", error);
-        }
-      });
-    }
     setTradeLevels([]);
-  }, [tradeLevels]);
+  }, []);
 
   // Create a new trade flow
   const createTradeFlow = useCallback((firstTradeType: TradePlacement) => {
@@ -345,7 +312,6 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
     tradeFlows,
     activeTradeFlow,
     activeTradeFlowStep,
-    lastPrice,
 
     setSelectedToken,
     setMacroActive,
@@ -361,7 +327,6 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
     updateMacroShortcut,
     activateTradeFlow,
     setActiveTradeFlowStep,
-    setLastPrice: (price: number) => setLastPrice(price),
     calculatePresetPrice,
   };
 
