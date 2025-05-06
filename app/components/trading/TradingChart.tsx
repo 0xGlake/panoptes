@@ -23,6 +23,7 @@ export const TradingChart: React.FC = () => {
     setSelectedToken,
     tradeLevels,
     addTradeLevel,
+    updateTradeLevel,
     activeTradeFlow,
     activeTradeFlowStep,
     tradeFlows,
@@ -54,6 +55,10 @@ export const TradingChart: React.FC = () => {
   const clickHandlerRef = useRef(
     (param: { point?: { x: number; y: number } }) => {},
   );
+
+  // Track dragging state
+  const [isDragging, setIsDragging] = useState(false);
+  const draggedLevelRef = useRef<{ id: string; initialY: number } | null>(null);
 
   // ===== WEBSOCKET CONNECTION =====
   const { lastMessage, readyState } = useWebSocket(
@@ -568,6 +573,149 @@ export const TradingChart: React.FC = () => {
     activateTradeFlow,
     calculatePresetPrice,
   ]);
+
+  useEffect(() => {
+    if (!containerRef.current || !seriesRef.current || !chartRef.current)
+      return;
+
+    const container = containerRef.current;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!seriesRef.current) return;
+
+      // Convert mouse Y coordinate to price to find nearby price lines
+      const rect = container.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const mousePrice = seriesRef.current.coordinateToPrice(y);
+
+      // Find the closest price line within tolerance
+      const PRICE_LINE_TOLERANCE = 10; // pixels
+      let closestLevel: TradeLevel | null = null;
+      let minDistance = Infinity;
+
+      tradeLevels.forEach((level) => {
+        if (level.active && level.IpriceLine) {
+          const linePrice = level.IpriceLine.options().price;
+          const lineY = seriesRef.current!.priceToCoordinate(linePrice) || 0;
+          const distance = Math.abs(y - lineY);
+
+          if (distance < PRICE_LINE_TOLERANCE && distance < minDistance) {
+            minDistance = distance;
+            closestLevel = level;
+          }
+        }
+      });
+
+      if (closestLevel) {
+        setIsDragging(true);
+        draggedLevelRef.current = {
+          id: closestLevel.id,
+          initialY: y,
+        };
+        e.preventDefault();
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !draggedLevelRef.current || !seriesRef.current) return;
+
+      // Calculate new price based on mouse position
+      const rect = container.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const newPrice = seriesRef.current.coordinateToPrice(y);
+
+      // Find the level being dragged
+      const level = tradeLevels.find(
+        (l) => l.id === draggedLevelRef.current!.id,
+      );
+      if (!level || !level.IpriceLine) return;
+
+      // Update price line position
+      seriesRef.current.removePriceLine(level.IpriceLine);
+
+      // Create new price line at updated position
+      const priceLine = seriesRef.current.createPriceLine({
+        ...level.IpriceLine.options(),
+        price: newPrice,
+        title: `${level.IpriceLine.options().title?.split(":")[0] || "Price"}: ${newPrice.toFixed(2)}`,
+      });
+
+      // Update the trade level with new price line
+      updateTradeLevel({
+        ...level,
+        IpriceLine: priceLine,
+      });
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        draggedLevelRef.current = null;
+      }
+    };
+
+    // Add event listeners
+    container.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    // Cleanup
+    return () => {
+      container.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [tradeLevels, isDragging, updateTradeLevel, seriesRef, chartRef]);
+
+  // Add cursor styling for draggable behavior
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        containerRef.current!.style.cursor = "grabbing";
+        return;
+      }
+
+      // Check if mouse is near a price line
+      if (seriesRef.current) {
+        const rect = containerRef.current!.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const mousePrice = seriesRef.current.coordinateToPrice(y);
+
+        let nearPriceLine = false;
+        const PRICE_LINE_TOLERANCE = 10;
+
+        tradeLevels.forEach((level) => {
+          if (level.active && level.IpriceLine) {
+            const linePrice = level.IpriceLine.options().price;
+            const lineY = seriesRef.current!.priceToCoordinate(linePrice) || 0;
+            const distance = Math.abs(y - lineY);
+
+            if (distance < PRICE_LINE_TOLERANCE) {
+              nearPriceLine = true;
+            }
+          }
+        });
+
+        containerRef.current!.style.cursor = nearPriceLine
+          ? activeTradeFlow
+            ? "crosshair"
+            : "grab"
+          : activeTradeFlow
+            ? "crosshair"
+            : "default";
+      }
+    };
+
+    containerRef.current.addEventListener("mousemove", handleMouseMove);
+
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener("mousemove", handleMouseMove);
+      }
+    };
+  }, [tradeLevels, isDragging, activeTradeFlow]);
 
   // ===== PROCESS WEBSOCKET DATA =====
   useEffect(() => {
