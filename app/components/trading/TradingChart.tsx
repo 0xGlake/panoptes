@@ -7,6 +7,7 @@ import {
   IChartApi,
   ISeriesApi,
   UTCTimestamp,
+  IPriceLine,
 } from "lightweight-charts";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { useTradingContext } from "../../context/TradingContext";
@@ -47,7 +48,7 @@ export const TradingChart: React.FC = () => {
   const userPositionedChart = useRef(false);
 
   // Track price lines that we've created in a ref
-  const priceLinesRef = useRef<Map<string, any>>(new Map());
+  const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map());
 
   // Store the click handler in a ref to prevent dependency issues
   const clickHandlerRef = useRef(

@@ -24,6 +24,7 @@ interface TradingContextType {
   setSelectedToken: (token: ArbitrageToken) => void;
   setMacroActive: (active: boolean) => void;
   addTradeLevel: (level: Omit<TradeLevel, "id">) => void;
+  updateTradeLevel: (level: TradeLevel) => void;
   removeTradeLevel: (id: string) => void;
   clearAllTradeLevels: () => void;
   createTradeFlow: (firstTradeType: TradePlacement) => void;
@@ -62,6 +63,7 @@ export const TradingContext = createContext<TradingContextType>({
   setSelectedToken: () => {},
   setMacroActive: () => {},
   addTradeLevel: () => {},
+  updateTradeLevel: () => {},
   removeTradeLevel: () => {},
   clearAllTradeLevels: () => {},
   createTradeFlow: () => {},
@@ -98,6 +100,10 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
   const addTradeLevel = useCallback((level: Omit<TradeLevel, "id">) => {
     const id = `level-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     setTradeLevels((prev) => [...prev, { ...level, id }]);
+  }, []);
+
+  const updateTradeLevel = useCallback((level: TradeLevel) => {
+    setTradeLevels((prev) => prev.map((l) => (l.id === level.id ? level : l)));
   }, []);
 
   // Remove a trade level - no chart manipulation, just state update
@@ -316,6 +322,7 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({
     setSelectedToken,
     setMacroActive,
     addTradeLevel,
+    updateTradeLevel,
     removeTradeLevel,
     clearAllTradeLevels,
     createTradeFlow,
