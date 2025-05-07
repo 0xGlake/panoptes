@@ -56,9 +56,17 @@ export const TradingChart: React.FC = () => {
     (param: { point?: { x: number; y: number } }) => {},
   );
 
-  // Track dragging state
-  const [isDragging, setIsDragging] = useState(false);
-  const draggedLevelRef = useRef<{ id: string; initialY: number } | null>(null);
+  // State to track whether levels are locked
+  const [areLevelsLocked, setAreLevelsLocked] = useState(false);
+
+  // State to track dragging
+  const [dragState, setDragState] = useState<{
+    isDragging: boolean;
+    levelId: string | null;
+  }>({
+    isDragging: false,
+    levelId: null,
+  });
 
   // ===== WEBSOCKET CONNECTION =====
   const { lastMessage, readyState } = useWebSocket(
@@ -574,148 +582,148 @@ export const TradingChart: React.FC = () => {
     calculatePresetPrice,
   ]);
 
-  useEffect(() => {
-    if (!containerRef.current || !seriesRef.current || !chartRef.current)
-      return;
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      // Skip if levels are locked
+      if (areLevelsLocked) return;
 
-    const container = containerRef.current;
+      if (!containerRef.current || !seriesRef.current || !chartRef.current)
+        return;
 
-    const handleMouseDown = (e: MouseEvent) => {
-      if (!seriesRef.current) return;
-
-      // Convert mouse Y coordinate to price to find nearby price lines
-      const rect = container.getBoundingClientRect();
+      // Get chart coordinates
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      const mousePrice = seriesRef.current.coordinateToPrice(y);
 
-      // Find the closest price line within tolerance
-      const PRICE_LINE_TOLERANCE = 10; // pixels
-      let closestLevel: TradeLevel | null = null;
-      let minDistance = Infinity;
+      // Convert to price
+      const clickedPrice = seriesRef.current.coordinateToPrice(y);
 
-      tradeLevels.forEach((level) => {
+      // Find if we clicked directly on a price line
+      let targetLevelId: string | null = null;
+
+      for (const level of tradeLevels) {
         if (level.active && level.IpriceLine) {
           const linePrice = level.IpriceLine.options().price;
-          const lineY = seriesRef.current!.priceToCoordinate(linePrice) || 0;
-          const distance = Math.abs(y - lineY);
 
-          if (distance < PRICE_LINE_TOLERANCE && distance < minDistance) {
-            minDistance = distance;
-            closestLevel = level;
+          // Check if the click is on or very near the price line
+          // Using a much tighter tolerance than before
+          if (Math.abs(clickedPrice - linePrice) < linePrice * 0.002) {
+            // 0.2% tolerance
+            targetLevelId = level.id;
+            break;
           }
         }
-      });
-
-      if (closestLevel) {
-        setIsDragging(true);
-        draggedLevelRef.current = {
-          id: closestLevel.id,
-          initialY: y,
-        };
-        e.preventDefault();
       }
-    };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !draggedLevelRef.current || !seriesRef.current) return;
+      if (targetLevelId) {
+        // Start dragging
+        setDragState({
+          isDragging: true,
+          levelId: targetLevelId,
+        });
 
-      // Calculate new price based on mouse position
-      const rect = container.getBoundingClientRect();
+        // Disable chart scrolling/scaling during drag
+        chartRef.current.applyOptions({
+          handleScroll: false,
+          handleScale: false,
+        });
+
+        // Prevent any other chart interactions
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    [tradeLevels, areLevelsLocked],
+  );
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (
+        !dragState.isDragging ||
+        !dragState.levelId ||
+        !containerRef.current ||
+        !seriesRef.current
+      )
+        return;
+
+      // Get chart coordinates
+      const rect = containerRef.current.getBoundingClientRect();
       const y = e.clientY - rect.top;
+
+      // Convert to price
       const newPrice = seriesRef.current.coordinateToPrice(y);
 
       // Find the level being dragged
-      const level = tradeLevels.find(
-        (l) => l.id === draggedLevelRef.current!.id,
-      );
-      if (!level || !level.IpriceLine) return;
+      const level = tradeLevels.find((l) => l.id === dragState.levelId);
+      if (!level) return;
 
-      // Update price line position
-      seriesRef.current.removePriceLine(level.IpriceLine);
-
-      // Create new price line at updated position
-      const priceLine = seriesRef.current.createPriceLine({
-        ...level.IpriceLine.options(),
+      // Update the price line visually
+      level.IpriceLine.applyOptions({
         price: newPrice,
-        title: `${level.IpriceLine.options().title?.split(":")[0] || "Price"}: ${newPrice.toFixed(2)}`,
+        title: `${level.IpriceLine.options().title.split(":")[0]}: ${newPrice.toFixed(2)}`,
       });
+    },
+    [dragState, tradeLevels],
+  );
 
-      // Update the trade level with new price line
-      updateTradeLevel({
-        ...level,
-        IpriceLine: priceLine,
-      });
-    };
+  const handleMouseUp = useCallback(() => {
+    if (!dragState.isDragging || !dragState.levelId || !chartRef.current)
+      return;
 
-    const handleMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-        draggedLevelRef.current = null;
+    // Find the level that was being dragged
+    const level = tradeLevels.find((l) => l.id === dragState.levelId);
+    if (!level) return;
+
+    // Get the updated price from the price line
+    const newPrice = level.IpriceLine.options().price;
+
+    // Update the level in context
+    updateTradeLevel({
+      ...level,
+      IpriceLine: level.IpriceLine,
+    });
+
+    // Reset drag state
+    setDragState({
+      isDragging: false,
+      levelId: null,
+    });
+
+    // Re-enable chart scrolling/scaling
+    chartRef.current.applyOptions({
+      handleScroll: true,
+      handleScale: true,
+    });
+  }, [dragState, tradeLevels, updateTradeLevel]);
+
+  // We need a special click handler for the chart container that doesn't interfere with chart clicks
+  const handleContainerClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      // If we're not dragging and not in an active trade flow, allow normal clicks
+      if (!dragState.isDragging && activeTradeFlow) {
+        // Let the original click handler handle this
+        // Do not preventDefault or stopPropagation
+      } else {
+        // For dragging operations, prevent default to avoid chart interactions
+        e.preventDefault();
+        e.stopPropagation();
       }
-    };
+    },
+    [dragState.isDragging, activeTradeFlow],
+  );
 
-    // Add event listeners
-    container.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    // Cleanup
-    return () => {
-      container.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [tradeLevels, isDragging, updateTradeLevel, seriesRef, chartRef]);
-
-  // Add cursor styling for draggable behavior
+  // Set up global event listeners for mouseup and mousemove
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        containerRef.current!.style.cursor = "grabbing";
-        return;
-      }
-
-      // Check if mouse is near a price line
-      if (seriesRef.current) {
-        const rect = containerRef.current!.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        const mousePrice = seriesRef.current.coordinateToPrice(y);
-
-        let nearPriceLine = false;
-        const PRICE_LINE_TOLERANCE = 10;
-
-        tradeLevels.forEach((level) => {
-          if (level.active && level.IpriceLine) {
-            const linePrice = level.IpriceLine.options().price;
-            const lineY = seriesRef.current!.priceToCoordinate(linePrice) || 0;
-            const distance = Math.abs(y - lineY);
-
-            if (distance < PRICE_LINE_TOLERANCE) {
-              nearPriceLine = true;
-            }
-          }
-        });
-
-        containerRef.current!.style.cursor = nearPriceLine
-          ? activeTradeFlow
-            ? "crosshair"
-            : "grab"
-          : activeTradeFlow
-            ? "crosshair"
-            : "default";
-      }
-    };
-
-    containerRef.current.addEventListener("mousemove", handleMouseMove);
+    // Add global event listeners
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
 
     return () => {
-      if (containerRef.current) {
-        containerRef.current.removeEventListener("mousemove", handleMouseMove);
-      }
+      // Remove global event listeners on cleanup
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [tradeLevels, isDragging, activeTradeFlow]);
+  }, [handleMouseMove, handleMouseUp]);
 
   // ===== PROCESS WEBSOCKET DATA =====
   useEffect(() => {
@@ -803,19 +811,35 @@ export const TradingChart: React.FC = () => {
           ))}
         </select>
 
-        <div className="text-sm flex items-center">
-          <span
-            className={`h-2 w-2 rounded-full mr-2 ${
-              readyState === ReadyState.OPEN ? "bg-green-500" : "bg-red-500"
+        <div className="flex items-center space-x-4">
+          {/* Lock/Unlock button for trade levels */}
+          <button
+            className={`px-3 py-1 rounded flex items-center text-sm ${
+              areLevelsLocked
+                ? "bg-gray-700 text-white"
+                : "bg-blue-600 text-white"
             }`}
-          ></span>
-          <span className="text-gray-300">
-            {readyState === ReadyState.OPEN
-              ? "Live"
-              : readyState === ReadyState.CONNECTING
-                ? "Connecting..."
-                : "Disconnected"}
-          </span>
+            onClick={() => setAreLevelsLocked((prev) => !prev)}
+          >
+            <span>
+              {areLevelsLocked ? "🔒 Unlock Levels" : "🔓 Lock Levels"}
+            </span>
+          </button>
+
+          <div className="text-sm flex items-center">
+            <span
+              className={`h-2 w-2 rounded-full mr-2 ${
+                readyState === ReadyState.OPEN ? "bg-green-500" : "bg-red-500"
+              }`}
+            ></span>
+            <span className="text-gray-300">
+              {readyState === ReadyState.OPEN
+                ? "Live"
+                : readyState === ReadyState.CONNECTING
+                  ? "Connecting..."
+                  : "Disconnected"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -831,9 +855,14 @@ export const TradingChart: React.FC = () => {
         style={{
           zIndex: 10,
           position: "relative",
-          cursor: activeTradeFlow ? "crosshair" : "default",
+          cursor: dragState.isDragging
+            ? "ns-resize"
+            : activeTradeFlow
+              ? "crosshair"
+              : "default",
         }}
         data-testid="chart-container"
+        onMouseDown={handleMouseDown}
       />
 
       <div className="w-full mt-2 text-xs text-gray-400 flex justify-between items-center">
