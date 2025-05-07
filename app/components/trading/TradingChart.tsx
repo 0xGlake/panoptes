@@ -720,10 +720,8 @@ export const TradingChart: React.FC = () => {
   // ===== PROCESS WEBSOCKET DATA =====
   useEffect(() => {
     if (!lastMessage?.data || !seriesRef.current) return;
-
     try {
       const data = JSON.parse(lastMessage.data);
-
       if (data.data?.a?.[0]) {
         const askPrice = parseFloat(data.data.a[0].p);
         const timestamp = data.ts; // milliseconds
@@ -733,20 +731,24 @@ export const TradingChart: React.FC = () => {
           lastPriceRef.current = askPrice;
         }
 
-        // Process for candle
-        const minute = Math.floor(timestamp / (60 * 1000));
+        // Only calculate current minute timestamp once per tick
         const utcTimestamp = Math.floor(timestamp / 1000) as UTCTimestamp;
+        const newMinute = Math.floor(timestamp / (60 * 1000));
 
         // Check if this is a new minute
-        if (minute !== currentMinute.current) {
+        if (newMinute !== currentMinute.current) {
           // Finalize previous candle if it exists
           if (currentCandle.current) {
             currentCandle.current.close = lastPriceRef.current;
+            // Add to candles array for history
             candles.current.push({ ...currentCandle.current });
+
+            // Use update for efficiency
+            seriesRef.current.update(currentCandle.current);
           }
 
           // Create new candle
-          currentMinute.current = minute;
+          currentMinute.current = newMinute;
           currentCandle.current = {
             time: utcTimestamp,
             open: lastPriceRef.current,
@@ -768,14 +770,10 @@ export const TradingChart: React.FC = () => {
             currentCandle.current.low = askPrice;
           }
           currentCandle.current.close = askPrice;
-        }
 
-        // Update chart data
-        const updatedCandles = [...candles.current];
-        if (currentCandle.current) {
-          updatedCandles.push(currentCandle.current);
+          // This updates just the one candle without creating any new arrays
+          seriesRef.current.update(currentCandle.current);
         }
-        seriesRef.current.setData(updatedCandles);
 
         // Save last price
         lastPriceRef.current = askPrice;
