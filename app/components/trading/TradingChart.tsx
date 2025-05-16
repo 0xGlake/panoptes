@@ -51,6 +51,45 @@ export const TradingChart: React.FC = () => {
   // Track price lines that we've created in a ref
   const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map());
 
+  // Track the currently hovered price line
+  const hoveredPriceLineRef = useRef<string | null>(null);
+
+  // Helper function to create price lines with unique IDs
+  const createPriceLine = useCallback(
+    (params: {
+      price: number;
+      color: string;
+      title: string;
+      lineWidth?: LineWidth;
+      lineStyle?: LineStyle;
+    }): { priceLine: IPriceLine; id: string } | null => {
+      if (!seriesRef.current) return null;
+
+      const {
+        price,
+        color,
+        title,
+        lineWidth = 2 as LineWidth,
+        lineStyle = LineStyle.Solid,
+      } = params;
+
+      const priceLineId = crypto.randomUUID(); // Generate unique ID
+
+      const priceLine = seriesRef.current.createPriceLine({
+        price,
+        color,
+        lineWidth,
+        lineStyle,
+        axisLabelVisible: true,
+        title,
+        id: priceLineId, // Use the generated ID
+      });
+
+      return { priceLine, id: priceLineId };
+    },
+    [],
+  );
+
   // Store the click handler in a ref to prevent dependency issues
   const clickHandlerRef = useRef(
     (param: { point?: { x: number; y: number } }) => {},
@@ -63,9 +102,11 @@ export const TradingChart: React.FC = () => {
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     levelId: string | null;
+    priceLineId: string | null;
   }>({
     isDragging: false,
     levelId: null,
+    priceLineId: null,
   });
 
   // ===== WEBSOCKET CONNECTION =====
@@ -128,14 +169,14 @@ export const TradingChart: React.FC = () => {
 
       // Create price line
       try {
-        const priceLine = seriesRef.current.createPriceLine({
-          price: price,
-          color: color,
-          lineWidth: 2 as LineWidth,
-          lineStyle: LineStyle.Solid,
-          axisLabelVisible: true,
+        const result = createPriceLine({
+          price,
+          color,
           title: `${title}: ${price.toFixed(2)}`,
         });
+
+        if (!result) return; // Guard against null
+        const { priceLine, id } = result;
 
         // Add to context
         addTradeLevel({
@@ -143,6 +184,7 @@ export const TradingChart: React.FC = () => {
           active: true,
           quantity: 1,
           IpriceLine: priceLine,
+          priceLineId: id, // Store the ID with the trade level
         });
 
         // Mark as placed
@@ -168,20 +210,22 @@ export const TradingChart: React.FC = () => {
                 flow.presets.takeP,
               );
 
-              const takeProfitLine = seriesRef.current.createPriceLine({
+              const takeProfitResult = createPriceLine({
                 price: takeProfitPrice,
-                color: "#2196F3",
-                lineWidth: 2 as LineWidth,
-                lineStyle: LineStyle.Solid,
-                axisLabelVisible: true,
-                title: `Take Profit (Auto): ${takeProfitPrice.toFixed(2)}`,
+                color: "#4CAF50",
+                title: `Take Profit: ${takeProfitPrice.toFixed(2)}`,
               });
+
+              if (!takeProfitResult) return; // Guard against null
+              const { priceLine: takeProfitLine, id: takeProfitId } =
+                takeProfitResult;
 
               addTradeLevel({
                 type: takeProfitTrade,
                 active: true,
                 quantity: 1,
                 IpriceLine: takeProfitLine,
+                priceLineId: takeProfitId, // Store the ID with the trade level
               });
 
               setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
@@ -204,20 +248,22 @@ export const TradingChart: React.FC = () => {
                 flow.presets.stopL,
               );
 
-              const stopLossLine = seriesRef.current.createPriceLine({
+              const stopLossResult = createPriceLine({
                 price: stopLossPrice,
-                color: "#FF9800",
-                lineWidth: 2 as LineWidth,
-                lineStyle: LineStyle.Solid,
-                axisLabelVisible: true,
-                title: `Stop Loss (Auto): ${stopLossPrice.toFixed(2)}`,
+                color: "#F44336",
+                title: `Stop Loss: ${stopLossPrice.toFixed(2)}`,
               });
+
+              if (!stopLossResult) return; // Guard against null
+              const { priceLine: stopLossLine, id: stopLossId } =
+                stopLossResult;
 
               addTradeLevel({
                 type: stopLossTrade,
                 active: true,
                 quantity: 1,
                 IpriceLine: stopLossLine,
+                priceLineId: stopLossId, // Store the ID with the trade level
               });
 
               setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
@@ -284,6 +330,7 @@ export const TradingChart: React.FC = () => {
         chartRef.current.unsubscribeClick((param) =>
           clickHandlerRef.current(param),
         );
+        chartRef.current.unsubscribeCrosshairMove(() => {});
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
@@ -332,7 +379,39 @@ export const TradingChart: React.FC = () => {
 
       // Then add click handler using the ref
       chart.subscribeClick((param) => clickHandlerRef.current(param));
-      console.log("Successfully subscribed to click events");
+
+      // Subscribe to crosshair move to detect hovering over price lines
+      chart.subscribeCrosshairMove((param) => {
+        // Check if we're hovering over a price line
+        if (param.hoveredObjectId) {
+          hoveredPriceLineRef.current = param.hoveredObjectId;
+
+          // Change cursor to indicate draggable item (only if the price line is one of our trade levels)
+          const isPriceLineTradeable = tradeLevels.some(
+            (level) =>
+              level.active && level.priceLineId === param.hoveredObjectId,
+          );
+
+          if (
+            containerRef.current &&
+            !dragState.isDragging &&
+            !areLevelsLocked &&
+            isPriceLineTradeable
+          ) {
+            containerRef.current.style.cursor = "grab";
+          }
+        } else {
+          hoveredPriceLineRef.current = null;
+          // Reset cursor unless we're dragging
+          if (containerRef.current && !dragState.isDragging) {
+            containerRef.current.style.cursor = activeTradeFlow
+              ? "crosshair"
+              : "default";
+          }
+        }
+      });
+
+      console.log("Successfully subscribed to click and crosshair events");
     };
 
     // Set up chart
@@ -342,6 +421,15 @@ export const TradingChart: React.FC = () => {
     lastPriceRef.current = null;
     candles.current = [];
     currentCandle.current = null;
+    hoveredPriceLineRef.current = null;
+
+    // Reset drag state
+    setDragState({
+      isDragging: false,
+      levelId: null,
+      priceLineId: null,
+    });
+
     currentMinute.current = -1;
     userPositionedChart.current = false;
 
@@ -360,9 +448,11 @@ export const TradingChart: React.FC = () => {
         chartRef.current.unsubscribeClick((param) =>
           clickHandlerRef.current(param),
         );
+        chartRef.current.unsubscribeCrosshairMove(() => {});
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
+        hoveredPriceLineRef.current = null;
       }
     };
   }, [selectedToken, handleResize]); // Only recreate chart when token changes
@@ -466,14 +556,14 @@ export const TradingChart: React.FC = () => {
     const price = lastPriceRef.current;
 
     try {
-      const priceLine = seriesRef.current.createPriceLine({
-        price: price,
+      const result = createPriceLine({
+        price,
         color: "#4CAF50",
-        lineWidth: 2 as LineWidth,
-        lineStyle: LineStyle.Solid,
-        axisLabelVisible: true,
         title: `Market Entry: ${price.toFixed(2)}`,
       });
+
+      if (!result) return; // Guard against null
+      const { priceLine, id } = result;
 
       // Add to context
       addTradeLevel({
@@ -481,6 +571,7 @@ export const TradingChart: React.FC = () => {
         active: true,
         quantity: 1,
         IpriceLine: priceLine,
+        priceLineId: id, // Store the ID with the trade level
       });
 
       // Mark as placed
@@ -498,20 +589,22 @@ export const TradingChart: React.FC = () => {
             flow.presets.takeP,
           );
 
-          const takeProfitLine = seriesRef.current.createPriceLine({
+          const takeProfitResult = createPriceLine({
             price: takeProfitPrice,
-            color: "#2196F3",
-            lineWidth: 2 as LineWidth,
-            lineStyle: LineStyle.Solid,
-            axisLabelVisible: true,
-            title: `Take Profit (Auto): ${takeProfitPrice.toFixed(2)}`,
+            color: "#4CAF50",
+            title: `Take Profit: ${takeProfitPrice.toFixed(2)}`,
           });
+
+          if (!takeProfitResult) return; // Guard against null
+          const { priceLine: takeProfitLine, id: takeProfitId } =
+            takeProfitResult;
 
           addTradeLevel({
             type: takeProfitTrade,
             active: true,
             quantity: 1,
             IpriceLine: takeProfitLine,
+            priceLineId: takeProfitId, // Store the ID with the trade level
           });
 
           setPlacedOrderTypes((prev) => new Set([...prev, "takeP"]));
@@ -530,20 +623,21 @@ export const TradingChart: React.FC = () => {
             flow.presets.stopL,
           );
 
-          const stopLossLine = seriesRef.current.createPriceLine({
+          const stopLossResult = createPriceLine({
             price: stopLossPrice,
-            color: "#FF9800",
-            lineWidth: 2 as LineWidth,
-            lineStyle: LineStyle.Solid,
-            axisLabelVisible: true,
-            title: `Stop Loss (Auto): ${stopLossPrice.toFixed(2)}`,
+            color: "#F44336",
+            title: `Stop Loss: ${stopLossPrice.toFixed(2)}`,
           });
+
+          if (!stopLossResult) return; // Guard against null
+          const { priceLine: stopLossLine, id: stopLossId } = stopLossResult;
 
           addTradeLevel({
             type: stopLossTrade,
             active: true,
             quantity: 1,
             IpriceLine: stopLossLine,
+            priceLineId: stopLossId, // Store the ID with the trade level
           });
 
           setPlacedOrderTypes((prev) => new Set([...prev, "stopL"]));
@@ -580,6 +674,7 @@ export const TradingChart: React.FC = () => {
     setActiveTradeFlowStep,
     activateTradeFlow,
     calculatePresetPrice,
+    createPriceLine,
   ]);
 
   const handleMouseDown = useCallback(
@@ -590,47 +685,44 @@ export const TradingChart: React.FC = () => {
       if (!containerRef.current || !seriesRef.current || !chartRef.current)
         return;
 
-      // Get chart coordinates
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      // Check if we clicked on a price line using the hoveredObjectId
+      const hoveredId = hoveredPriceLineRef.current;
 
-      // Convert to price
-      const clickedPrice = seriesRef.current.coordinateToPrice(y);
+      if (hoveredId && !areLevelsLocked) {
+        // Find the trade level with the matching price line ID
+        const targetLevel = tradeLevels.find(
+          (level) =>
+            level.active && level.IpriceLine && level.priceLineId === hoveredId,
+        );
 
-      // Find if we clicked directly on a price line
-      let targetLevelId: string | null = null;
+        if (targetLevel) {
+          // Start dragging
+          setDragState({
+            isDragging: true,
+            levelId: targetLevel.id,
+            priceLineId: targetLevel.priceLineId || null,
+          });
 
-      for (const level of tradeLevels) {
-        if (level.active && level.IpriceLine) {
-          const linePrice = level.IpriceLine.options().price;
+          // Disable chart scrolling/scaling during drag
+          chartRef.current.applyOptions({
+            handleScroll: false,
+            handleScale: false,
+          });
 
-          // Check if the click is on or very near the price line
-          // Using a much tighter tolerance than before
-          if (Math.abs(clickedPrice - linePrice) < linePrice * 0.002) {
-            // 0.2% tolerance
-            targetLevelId = level.id;
-            break;
+          // Prevent any other chart interactions
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Set cursor style to indicate active dragging
+          if (containerRef.current) {
+            containerRef.current.style.cursor = "ns-resize";
           }
+
+          // Track that we've started a drag operation
+          console.log(
+            `Started dragging price level: ${targetLevel.id}, initial price: ${targetLevel.IpriceLine.options().price}`,
+          );
         }
-      }
-
-      if (targetLevelId) {
-        // Start dragging
-        setDragState({
-          isDragging: true,
-          levelId: targetLevelId,
-        });
-
-        // Disable chart scrolling/scaling during drag
-        chartRef.current.applyOptions({
-          handleScroll: false,
-          handleScale: false,
-        });
-
-        // Prevent any other chart interactions
-        e.preventDefault();
-        e.stopPropagation();
       }
     },
     [tradeLevels, areLevelsLocked],
@@ -646,7 +738,7 @@ export const TradingChart: React.FC = () => {
       )
         return;
 
-      // Get chart coordinates
+      // Get Y coordinate relative to chart
       const rect = containerRef.current.getBoundingClientRect();
       const y = e.clientY - rect.top;
 
@@ -655,13 +747,22 @@ export const TradingChart: React.FC = () => {
 
       // Find the level being dragged
       const level = tradeLevels.find((l) => l.id === dragState.levelId);
-      if (!level) return;
+      if (!level || !level.IpriceLine) return;
 
-      // Update the price line visually
+      // Get the original title prefix from current title or fallback to type
+      const currentTitle = level.IpriceLine.options().title || "";
+      const titlePrefix = currentTitle.split(":")[0].trim() || level.type.name;
+
+      // Update the price line in real-time
       level.IpriceLine.applyOptions({
         price: newPrice,
-        title: `${level.IpriceLine.options().title.split(":")[0]}: ${newPrice.toFixed(2)}`,
+        title: `${titlePrefix}: ${newPrice.toFixed(2)}`,
       });
+
+      // Update the cursor to indicate dragging
+      if (containerRef.current) {
+        containerRef.current.style.cursor = "ns-resize";
+      }
     },
     [dragState, tradeLevels],
   );
@@ -672,29 +773,64 @@ export const TradingChart: React.FC = () => {
 
     // Find the level that was being dragged
     const level = tradeLevels.find((l) => l.id === dragState.levelId);
-    if (!level) return;
+    if (!level || !level.IpriceLine) return;
 
-    // Get the updated price from the price line
-    const newPrice = level.IpriceLine.options().price;
+    try {
+      // Get the updated price from the price line
+      const newPrice = level.IpriceLine.options().price;
 
-    // Update the level in context
-    updateTradeLevel({
-      ...level,
-      IpriceLine: level.IpriceLine,
-    });
+      // Safety check for valid price
+      if (typeof newPrice !== "number" || isNaN(newPrice)) {
+        console.error("Invalid price detected during drag end:", newPrice);
+        return;
+      }
 
-    // Reset drag state
-    setDragState({
-      isDragging: false,
-      levelId: null,
-    });
+      // Update the level in state
+      updateTradeLevel({
+        ...level,
+        price: newPrice,
+        // Ensure priceLineId is always in sync with the price line
+        priceLineId: level.IpriceLine.options().id,
+      });
 
-    // Re-enable chart scrolling/scaling
-    chartRef.current.applyOptions({
-      handleScroll: true,
-      handleScale: true,
-    });
-  }, [dragState, tradeLevels, updateTradeLevel]);
+      // Reset drag state
+      setDragState({
+        isDragging: false,
+        levelId: null,
+        priceLineId: null,
+      });
+
+      // Re-enable chart scrolling/scaling
+      chartRef.current.applyOptions({
+        handleScroll: true,
+        handleScale: true,
+      });
+
+      // Reset cursor
+      if (containerRef.current) {
+        containerRef.current.style.cursor = activeTradeFlow
+          ? "crosshair"
+          : "default";
+      }
+
+      // Reset hover state
+      hoveredPriceLineRef.current = null;
+    } catch (error) {
+      console.error("Error during drag end:", error);
+      // Still reset the state even if an error occurs
+      setDragState({
+        isDragging: false,
+        levelId: null,
+      });
+
+      if (chartRef.current) {
+        chartRef.current.applyOptions({
+          handleScroll: true,
+          handleScale: true,
+        });
+      }
+    }
+  }, [dragState, tradeLevels, updateTradeLevel, activeTradeFlow]);
 
   // We need a special click handler for the chart container that doesn't interfere with chart clicks
   const handleContainerClick = useCallback(
@@ -712,18 +848,28 @@ export const TradingChart: React.FC = () => {
     [dragState.isDragging, activeTradeFlow],
   );
 
-  // Set up global event listeners for mouseup and mousemove
+  // Set up global event listeners for mouseup, mousemove, and mouseleave
   useEffect(() => {
     // Add global event listeners
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
 
+    // Handle case where mouse leaves the window during drag
+    const handleMouseLeave = () => {
+      if (dragState.isDragging) {
+        handleMouseUp();
+      }
+    };
+
+    document.body.addEventListener("mouseleave", handleMouseLeave);
+
     return () => {
       // Remove global event listeners on cleanup
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      document.body.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [handleMouseMove, handleMouseUp]);
+  }, [handleMouseMove, handleMouseUp, dragState.isDragging]);
 
   // ===== PROCESS WEBSOCKET DATA =====
   useEffect(() => {
@@ -855,11 +1001,7 @@ export const TradingChart: React.FC = () => {
         style={{
           zIndex: 10,
           position: "relative",
-          cursor: dragState.isDragging
-            ? "ns-resize"
-            : activeTradeFlow
-              ? "crosshair"
-              : "default",
+          // Cursor is now managed dynamically in the event handlers
         }}
         data-testid="chart-container"
         onMouseDown={handleMouseDown}

@@ -15,6 +15,7 @@ export interface TradeLevel {
   active: boolean;
   quantity: number;
   IpriceLine: IPriceLine;
+  priceLineId?: string; // ID of the price line for direct click handling
 }
 
 export interface TradeFlow {
