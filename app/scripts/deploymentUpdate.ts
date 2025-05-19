@@ -57,7 +57,7 @@ async function updateFundingRatesOnDeploy() {
       exchange.id,
       {
         forceHistorical: true,
-        daysToFetch: 90,
+        daysToFetch: 99,
       },
     );
 
