@@ -21,8 +21,14 @@ export interface MarketData {
   [key: string]: MarketStats;
 }
 
+export interface Exchange {
+  id: string;
+  name: string;
+  rates: FundingRate[];
+}
+
 export const useMarketData = () => {
-  const [ratesData, setRatesData] = useState([]);
+  const [ratesData, setRatesData] = useState<Exchange[]>([]);
   const [marketData, setMarketData] = useState<MarketData>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

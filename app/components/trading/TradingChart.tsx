@@ -92,7 +92,10 @@ export const TradingChart: React.FC = () => {
 
   // Store the click handler in a ref to prevent dependency issues
   const clickHandlerRef = useRef(
-    (param: { point?: { x: number; y: number } }) => {},
+    (param: { point?: { x: number; y: number } }) => {
+      // Initial empty implementation - will be replaced in useEffect
+      console.debug("Chart click handler not yet initialized", param);
+    },
   );
 
   // State to track whether levels are locked
@@ -302,6 +305,7 @@ export const TradingChart: React.FC = () => {
     setActiveTradeFlowStep,
     activateTradeFlow,
     calculatePresetPrice,
+    createPriceLine,
   ]);
 
   // ===== SETUP RESIZE HANDLER =====
@@ -455,7 +459,14 @@ export const TradingChart: React.FC = () => {
         hoveredPriceLineRef.current = null;
       }
     };
-  }, [selectedToken, handleResize]); // Only recreate chart when token changes
+  }, [
+    selectedToken,
+    handleResize,
+    activeTradeFlow,
+    areLevelsLocked,
+    dragState.isDragging,
+    tradeLevels,
+  ]); // Only recreate chart when token changes
 
   // ===== SYNC tradeLevels with chart =====
   useEffect(() => {

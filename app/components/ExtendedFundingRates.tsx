@@ -1,22 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createChart, IChartApi } from "lightweight-charts";
+import { createChart, IChartApi, Time } from "lightweight-charts";
 
-interface FundingRate {
-  id: string;
-  timestamp: string;
-  rate: number;
-  symbol: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Exchange {
-  id: string;
-  name: string;
-  rates: FundingRate[];
-}
+import { Exchange } from "../hooks/useMarketData";
 
 const COLORS = [
   "#2962FF",
@@ -56,7 +43,7 @@ const ExtendedFundingRates = ({
       );
       setSelectedSymbols(initial);
     }
-  }, [sortedSymbols]);
+  }, [sortedSymbols, selectedSymbols]);
 
   // Cleanup function
   useEffect(() => {
@@ -65,7 +52,7 @@ const ExtendedFundingRates = ({
         try {
           chart.remove();
         } catch (e) {
-          console.log("Chart already disposed");
+          console.log("Chart already disposed", e);
         }
       });
       chartsRef.current = {};
@@ -81,7 +68,7 @@ const ExtendedFundingRates = ({
       try {
         chart.remove();
       } catch (e) {
-        console.log("Chart already disposed");
+        console.log("Chart already disposed", e);
       }
     });
     chartsRef.current = {};
@@ -122,7 +109,7 @@ const ExtendedFundingRates = ({
 
       // Only create series for selected symbols
       Object.entries(selectedSymbols)
-        .filter(([_, isSelected]) => isSelected)
+        .filter(([, isSelected]) => isSelected)
         .forEach(([symbol], symbolIndex) => {
           const symbolRates = exchange.rates.filter(
             (rate) => rate.symbol === symbol,
@@ -138,7 +125,7 @@ const ExtendedFundingRates = ({
           });
 
           const chartData = symbolRates.map((rate) => ({
-            time: new Date(rate.timestamp).getTime() / 1000,
+            time: (new Date(rate.timestamp).getTime() / 1000) as Time,
             value: rate.rate * 100,
           }));
 
