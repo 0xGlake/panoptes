@@ -42,10 +42,9 @@ const MarketCards = ({ symbols, marketData }: MarketCardsProps) => {
 
   return (
     <div className="w-full pt-5 flex flex-col items-center mb-4">
-      <h1>Extended Market Statistics</h1>
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-3/12 flex items-center justify-between p-2 bg-gray-100 rounded-lg mb-2 hover:bg-gray-200 transition-colors"
+        className="w-3/12 flex items-center justify-between p-2 bg-gray-300 rounded-lg mb-2 hover:bg-gray-200 transition-colors"
       >
         <span className="font-medium text-gray-700">
           Extended Market Statistics
@@ -53,7 +52,7 @@ const MarketCards = ({ symbols, marketData }: MarketCardsProps) => {
         {isExpanded ? (
           <span className="text-gray-600">Hide</span>
         ) : (
-          <span className="text-gray-600">View all</span>
+          <span className="text-blue-600">View all</span>
         )}
       </button>
 

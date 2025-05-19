@@ -4,7 +4,7 @@ import MarketCards from "../components/MarketCards";
 import Link from "next/link";
 
 const MarketsPage = () => {
-  const { marketData, sortedSymbols, loading, error } = useMarketData();
+  const { loading, error, marketData, sortedSymbols } = useMarketData();
 
   return (
     <div className="flex flex-col items-center w-full p-4">
@@ -15,7 +15,6 @@ const MarketsPage = () => {
             ← Back to Home
           </Link>
         </div>
-
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>

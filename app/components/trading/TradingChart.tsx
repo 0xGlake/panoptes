@@ -305,7 +305,6 @@ export const TradingChart: React.FC = () => {
     setActiveTradeFlowStep,
     activateTradeFlow,
     calculatePresetPrice,
-    createPriceLine,
   ]);
 
   // ===== SETUP RESIZE HANDLER =====
@@ -459,14 +458,7 @@ export const TradingChart: React.FC = () => {
         hoveredPriceLineRef.current = null;
       }
     };
-  }, [
-    selectedToken,
-    handleResize,
-    activeTradeFlow,
-    areLevelsLocked,
-    dragState.isDragging,
-    tradeLevels,
-  ]); // Only recreate chart when token changes
+  }, [selectedToken, handleResize]); // Only recreate chart when token changes
 
   // ===== SYNC tradeLevels with chart =====
   useEffect(() => {

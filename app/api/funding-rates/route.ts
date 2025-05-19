@@ -1,13 +1,12 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/app/lib/prisma";
 import { NextResponse } from "next/server";
-
-const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
 
   try {
+    // Simple query without retry logic
     const exchanges = await prisma.exchange.findMany({
       include: {
         fundingRates: {
@@ -17,11 +16,12 @@ export async function GET(request: Request) {
           orderBy: {
             timestamp: "asc",
           },
+          take: 10000,
         },
       },
     });
 
-    // Transform the data to a more suitable format
+    // Transform the data
     const response = exchanges.map((exchange) => ({
       id: exchange.id,
       name: exchange.name,
@@ -37,8 +37,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json(response);
   } catch (error) {
+    // Safer error handling
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
     return NextResponse.json(
-      { error: "Failed to fetch funding rates with error: " + error },
+      { error: `Failed to fetch funding rates with error: ${errorMessage}` },
       { status: 500 },
     );
   }
