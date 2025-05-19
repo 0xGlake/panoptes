@@ -23,7 +23,7 @@ export const TradeFlowFactory: React.FC = memo(() => {
   return (
     <div className="w-full mt-4 border-t border-gray-700 pt-4">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-medium text-gray-300">Trade Flows</h2>
+        <h2 className="text-lg font-medium text-gray-700">Trade Flows</h2>
 
         <div className="relative">
           <button

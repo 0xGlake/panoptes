@@ -71,7 +71,7 @@ export const TradeStep: React.FC<TradeStepProps> = ({
         {canRemove && (
           <button
             onClick={handleRemove}
-            className="ml-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white transition-opacity"
+            className="ml-1 opacity-0 group-hover:opacity-100 text-gray-700 hover:text-white transition-opacity"
             title="Remove step"
           >
             ✕

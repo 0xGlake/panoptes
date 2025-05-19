@@ -1008,7 +1008,7 @@ export const TradingChart: React.FC = () => {
         onMouseDown={handleMouseDown}
       />
 
-      <div className="w-full mt-2 text-xs text-gray-400 flex justify-between items-center">
+      <div className="w-full mt-2 text-xs text-gray-700 flex justify-between items-center">
         <span>1 Minute Candles - Ask Price</span>
         <div className="flex gap-2">
           <button

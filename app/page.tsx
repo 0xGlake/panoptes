@@ -4,7 +4,9 @@ import Link from "next/link";
 const HomePage = () => {
   return (
     <div className="flex flex-col items-center w-full p-8">
-      <h1 className="text-3xl font-bold mb-8">Crypto Market Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8 text-gray-700">
+        Crypto Market Dashboard
+      </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
         <NavigationCard
@@ -27,6 +29,13 @@ const HomePage = () => {
           href="/arbitrage"
           bgColor="bg-purple-100"
         />
+
+        <NavigationCard
+          title="Trading Interface"
+          description="Use Lightweight TradingView for direct trade input"
+          href="/trading-interface"
+          bgColor="bg-red-100"
+        />
       </div>
     </div>
   );
@@ -48,10 +57,10 @@ const NavigationCard = ({
   return (
     <Link href={href} className="block">
       <div
-        className={`${bgColor} rounded-lg p-6 h-full shadow-md hover:shadow-lg transition-shadow duration-300`}
+        className={`${bgColor} rounded-lg p-6 h-full shadow-md hover:shadow-lg transition-shadow duration-300 text-gray-800`}
       >
         <h2 className="text-xl font-semibold mb-3">{title}</h2>
-        <p className="text-gray-700">{description}</p>
+        <p className="text-gray-600">{description}</p>
       </div>
     </Link>
   );
