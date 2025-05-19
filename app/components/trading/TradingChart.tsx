@@ -384,7 +384,7 @@ export const TradingChart: React.FC = () => {
       chart.subscribeCrosshairMove((param) => {
         // Check if we're hovering over a price line
         if (param.hoveredObjectId) {
-          hoveredPriceLineRef.current = param.hoveredObjectId;
+          hoveredPriceLineRef.current = param.hoveredObjectId as string;
 
           // Change cursor to indicate draggable item (only if the price line is one of our trade levels)
           const isPriceLineTradeable = tradeLevels.some(
@@ -559,7 +559,7 @@ export const TradingChart: React.FC = () => {
       const result = createPriceLine({
         price,
         color: "#4CAF50",
-        title: `Market Entry: ${price.toFixed(2)}`,
+        title: `Mark Entry: ${price.toFixed(2)}`,
       });
 
       if (!result) return; // Guard against null
@@ -751,12 +751,12 @@ export const TradingChart: React.FC = () => {
 
       // Get the original title prefix from current title or fallback to type
       const currentTitle = level.IpriceLine.options().title || "";
-      const titlePrefix = currentTitle.split(":")[0].trim() || level.type.name;
+      const titlePrefix = currentTitle.split(":")[0].trim() || level.type;
 
       // Update the price line in real-time
       level.IpriceLine.applyOptions({
-        price: newPrice,
-        title: `${titlePrefix}: ${newPrice.toFixed(2)}`,
+        price: newPrice!,
+        title: `${titlePrefix}: ${newPrice!.toFixed(2)}`,
       });
 
       // Update the cursor to indicate dragging
@@ -788,7 +788,7 @@ export const TradingChart: React.FC = () => {
       // Update the level in state
       updateTradeLevel({
         ...level,
-        price: newPrice,
+        IpriceLine: level.IpriceLine,
         // Ensure priceLineId is always in sync with the price line
         priceLineId: level.IpriceLine.options().id,
       });
@@ -821,6 +821,7 @@ export const TradingChart: React.FC = () => {
       setDragState({
         isDragging: false,
         levelId: null,
+        priceLineId: null,
       });
 
       if (chartRef.current) {
@@ -832,21 +833,21 @@ export const TradingChart: React.FC = () => {
     }
   }, [dragState, tradeLevels, updateTradeLevel, activeTradeFlow]);
 
-  // We need a special click handler for the chart container that doesn't interfere with chart clicks
-  const handleContainerClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      // If we're not dragging and not in an active trade flow, allow normal clicks
-      if (!dragState.isDragging && activeTradeFlow) {
-        // Let the original click handler handle this
-        // Do not preventDefault or stopPropagation
-      } else {
-        // For dragging operations, prevent default to avoid chart interactions
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    },
-    [dragState.isDragging, activeTradeFlow],
-  );
+  // // We need a special click handler for the chart container that doesn't interfere with chart clicks
+  // const handleContainerClick = useCallback(
+  //   (e: React.MouseEvent<HTMLDivElement>) => {
+  //     // If we're not dragging and not in an active trade flow, allow normal clicks
+  //     if (!dragState.isDragging && activeTradeFlow) {
+  //       // Let the original click handler handle this
+  //       // Do not preventDefault or stopPropagation
+  //     } else {
+  //       // For dragging operations, prevent default to avoid chart interactions
+  //       e.preventDefault();
+  //       e.stopPropagation();
+  //     }
+  //   },
+  //   [dragState.isDragging, activeTradeFlow],
+  // );
 
   // Set up global event listeners for mouseup, mousemove, and mouseleave
   useEffect(() => {
