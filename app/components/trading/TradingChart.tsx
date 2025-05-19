@@ -506,7 +506,6 @@ export const TradingChart: React.FC = () => {
   }, [tradeLevels]); // Add tradeLevels as dependency to respond to context changes
 
   // ===== TRADE FLOW HANDLING =====
-  // Reset placed orders when flow changes
   useEffect(() => {
     if (activeTradeFlow) {
       setPlacedOrderTypes(new Set());
